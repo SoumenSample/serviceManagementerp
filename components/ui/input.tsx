@@ -3,6 +3,14 @@ import { Input as InputPrimitive } from "@base-ui/react/input"
 import { cn } from "cn"
 
 function Input({ className, type, ...props }: React.ComponentProps<"input">) {
+  // Coerce undefined value to "" to prevent uncontrolled -> controlled switch
+  // when used with react-hook-form without proper defaultValues.
+  // Only normalize if `value` is explicitly passed as undefined.
+  const valueProps =
+    "value" in props && props.value === undefined
+      ? { value: "" }
+      : {}
+
   return (
     <InputPrimitive
       type={type}
@@ -12,6 +20,7 @@ function Input({ className, type, ...props }: React.ComponentProps<"input">) {
         className
       )}
       {...props}
+      {...valueProps}
     />
   )
 }

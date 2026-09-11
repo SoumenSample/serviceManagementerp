@@ -1,16 +1,15 @@
-// Stub auth for dashboard development - replace with real auth logic
+import { getAuth } from "./auth-server";
+import type { Role } from "./rbac";
+
 export type User = {
-  name: string
-  email: string
-  role: string
-}
+  name: string;
+  email: string;
+  role: Role;
+  id: string;
+};
 
 export async function getCurrentUser(): Promise<User | null> {
-  // TODO: replace with real session/JWT check (e.g., cookies, next-auth)
-  // Returning mock user so dashboard builds and renders without login page
-  return {
-    name: "Demo User",
-    email: "demo@espsoln.local",
-    role: "admin",
-  }
+  const auth = await getAuth();
+  if (!auth) return null;
+  return { name: auth.name, email: auth.email, role: auth.role, id: auth.sub };
 }

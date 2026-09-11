@@ -1,3 +1,4 @@
+import { Suspense } from "react"
 import { LoginForm1 } from "./components/login-form-1"
 import { Logo } from "@/components/logo"
 import Link from "next/link"
@@ -10,9 +11,11 @@ export default function Page() {
           <div className="bg-primary text-primary-foreground flex size-9 items-center justify-center rounded-md">
             <Logo size={24} />
           </div>
-          ShadcnStore
+          ESP Soln
         </Link>
-        <LoginForm1 />
+        <Suspense fallback={<div className="text-sm text-muted-foreground text-center">Loading...</div>}>
+          <LoginForm1 />
+        </Suspense>
       </div>
     </div>
   )

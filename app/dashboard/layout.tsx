@@ -4,12 +4,15 @@ import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/s
 import { DashboardSidebar } from "@/components/layout/dashboard-sidebar";
 import { Separator } from "@/components/ui/separator";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { NotificationBell } from "@/components/notifications/notification-bell";
+import { GlobalSearch } from "@/components/search/global-search";
+import { GlobalEngineerTracker } from "@/components/engineer/global-tracker";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
 
   if (!user) {
-    redirect("/login?next=/dashboard");
+    redirect("/sign-in?next=/dashboard");
   }
 
   // serialize for client sidebar (JWTPayload -> plain)
@@ -28,14 +31,18 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4">
           <SidebarTrigger />
           <Separator orientation="vertical" className="h-6" />
-          <div className="flex flex-1 items-center justify-between">
-            <p className="text-sm text-muted-foreground">UPS/Inverter AMC & Repair Service Tracking</p>
-            
+          <div className="flex flex-1 items-center justify-between gap-4">
+            <p className="hidden md:block text-sm text-muted-foreground">UPS/Inverter AMC & Repair Service Tracking</p>
+            <div className="flex items-center gap-2 flex-1 justify-end">
+              <GlobalSearch />
+              <NotificationBell />
+            </div>
           </div>
         </header>
         <main className="flex-1 p-4 md:p-6 bg-muted/20">{children}</main>
         </SidebarInset>
       </SidebarProvider>
+      <GlobalEngineerTracker role={sidebarUser.role} />
     </TooltipProvider>
   );
 }
