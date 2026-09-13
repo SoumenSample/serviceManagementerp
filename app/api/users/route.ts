@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { connectDB } from "@/lib/db";
 import { getAuth } from "@/lib/auth-server";
 import { createAuditLog, extractRequestMeta } from "@/lib/audit/audit-service";
-import { hasPermission } from "@/lib/rbac";
+import { hasPermission, canCreateUser } from "@/lib/rbac";
 import { User } from "@/models/User";
 import { createUserSchema } from "@/lib/validators";
 
@@ -50,7 +50,9 @@ export async function POST(req: Request) {
   const requester = await User.findById(auth.sub);
   if (!requester || !requester.isActive) return NextResponse.json({ error: "Account deactivated" }, { status: 403 });
 
-  // Super admin protection: only super_admin can create super_admin
+  // Hierarchy protection: manager can create coordinator/engineer/accounts/manager but not super_admin
+  if (!canCreateUser(auth.role as never, parsed.data.role as never)) return NextResponse.json({ error: "Forbidden: insufficient privilege to create role " + parsed.data.role }, { status: 403 });
+  // Super admin protection: only super_admin can create super_admin (redundant with canCreateUser but explicit)
   if (parsed.data.role === "super_admin" && auth.role !== "super_admin") return NextResponse.json({ error: "Only super_admin can create super_admin" }, { status: 403 });
 
   const exists = await User.findOne({ email: parsed.data.email.toLowerCase() });

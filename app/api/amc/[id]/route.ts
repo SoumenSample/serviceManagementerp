@@ -67,12 +67,23 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const end = parsed.data.endDate ? new Date(parsed.data.endDate) : existing.endDate;
   if (end < start) return NextResponse.json({ error: "End date must not be before start date" }, { status: 400 });
   if (parsed.data.contractAmount !== undefined && parsed.data.contractAmount < 0) return NextResponse.json({ error: "Amount cannot be negative" }, { status: 400 });
+  // Validate partial payment consistency
+  const newContractAmount = parsed.data.contractAmount !== undefined ? parsed.data.contractAmount : existing.contractAmount;
+  const newPaymentStatus = (parsed.data.paymentStatus as string) || existing.paymentStatus;
+  let newPaidAmount = parsed.data.paidAmount !== undefined ? Number(parsed.data.paidAmount) : (existing.paidAmount ?? 0);
+  if (newPaymentStatus === "PAID") newPaidAmount = newContractAmount;
+  if (newPaymentStatus !== "PARTIAL" && newPaymentStatus !== "PAID" && parsed.data.paidAmount === undefined) newPaidAmount = existing.paidAmount ?? 0;
+  if (newPaidAmount > newContractAmount) return NextResponse.json({ error: "Paid amount cannot exceed contract amount" }, { status: 400 });
+  if (newPaymentStatus === "PARTIAL" && (!newPaidAmount || newPaidAmount <= 0 || newPaidAmount >= newContractAmount)) return NextResponse.json({ error: "For PARTIAL, paid amount must be >0 and < contract amount" }, { status: 400 });
+  if (newPaymentStatus === "PARTIAL" && newPaidAmount === 0) return NextResponse.json({ error: "Paid amount required for PARTIAL" }, { status: 400 });
 
   Object.assign(existing, {
     ...parsed.data,
     ...(parsed.data.startDate ? { startDate: new Date(parsed.data.startDate) } : {}),
     ...(parsed.data.endDate ? { endDate: new Date(parsed.data.endDate) } : {}),
     assignedEngineer: parsed.data.assignedEngineer || undefined,
+    paymentStatus: newPaymentStatus as never,
+    paidAmount: newPaidAmount,
     updatedBy: auth.sub,
   });
   await existing.save();

@@ -39,6 +39,7 @@ export interface IAmcContract extends Document {
   endDate: Date;
   contractAmount: number;
   paymentStatus: PaymentStatus;
+  paidAmount: number;
   assignedEngineer?: Types.ObjectId;
   terms?: string;
   documents: IAmcDocument[];
@@ -87,6 +88,7 @@ const AmcContractSchema = new Schema<IAmcContract>(
     endDate: { type: Date, required: true, index: true },
     contractAmount: { type: Number, required: true, min: 0 },
     paymentStatus: { type: String, enum: PAYMENT_STATUSES, default: "NOT_BILLED", index: true },
+    paidAmount: { type: Number, default: 0, min: 0 },
     assignedEngineer: { type: Schema.Types.ObjectId, ref: "User", index: true },
     terms: String,
     documents: [AmcDocumentSchema],

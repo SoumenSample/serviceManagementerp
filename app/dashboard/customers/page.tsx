@@ -54,7 +54,7 @@ export default function CustomersPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Customers" description="Customer master — one customer can have multiple sites" action={<Button onClick={onAdd}>Add Customer</Button>} />
+      <PageHeader title="Customers" description="View and Manage Customers" action={<Button onClick={onAdd}>Add Customer</Button>} />
       <Card>
         <CardContent className="pt-6 space-y-4">
           <div className="flex gap-2">

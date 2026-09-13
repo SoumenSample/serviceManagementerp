@@ -120,3 +120,26 @@ export function hasPermission(role: Role, permission: Permission): boolean {
 export function hasAnyPermission(role: Role, perms: Permission[]): boolean {
   return perms.some((p) => hasPermission(role, p));
 }
+
+// Profile edit hierarchy: super_admin can edit everyone, manager can edit everyone except super_admin
+// "other" includes accounts. Coordinator/engineer/accounts can only edit own profile (self).
+export function canEditUser(editorRole: Role, targetRole: Role, editorId: string, targetId: string): boolean {
+  // Self-edit always allowed (field-level restrictions applied elsewhere)
+  if (String(editorId) === String(targetId)) return true;
+  if (editorRole === "super_admin") return true;
+  if (editorRole === "manager") {
+    // manager cannot touch super_admin
+    if (targetRole === "super_admin") return false;
+    // manager can edit manager, coordinator, engineer, accounts
+    return (["manager", "coordinator", "engineer", "accounts"] as Role[]).includes(targetRole);
+  }
+  // coordinator, engineer, accounts, etc. cannot edit other users' profiles
+  return false;
+}
+
+export function canCreateUser(creatorRole: Role, newRole: Role): boolean {
+  if (creatorRole === "super_admin") return true;
+  if (newRole === "super_admin") return false; // only super_admin can create super_admin
+  if (creatorRole === "manager") return (["manager", "coordinator", "engineer", "accounts"] as Role[]).includes(newRole);
+  return false;
+}

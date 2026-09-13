@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/common/page-header";
 import { amcUpdateSchema } from "@/lib/validators";
 import Link from "next/link";
@@ -22,8 +23,12 @@ export default function AmcEditPage() {
 
   const form = useForm<any>({
     resolver: zodResolver(amcUpdateSchema),
-    defaultValues: {},
+    defaultValues: { paymentStatus: "NOT_BILLED", contractAmount: 0, paidAmount: 0 },
+    shouldUnregister: false,
   });
+  const paymentStatusWatch = form.watch("paymentStatus");
+  const contractAmountWatch = form.watch("contractAmount");
+  const paidAmountWatch = form.watch("paidAmount");
 
   useEffect(() => {
     fetch(`/api/amc/${id}`).then(async (r) => {
@@ -38,6 +43,7 @@ export default function AmcEditPage() {
           endDate: d.endDate ? new Date(d.endDate).toISOString().slice(0, 10) : "",
           contractAmount: d.contractAmount,
           paymentStatus: d.paymentStatus,
+          paidAmount: d.paidAmount ?? 0,
           assignedEngineer: d.assignedEngineer ? String(d.assignedEngineer._id || d.assignedEngineer) : "",
           terms: d.terms || "",
           status: d.status,
@@ -70,6 +76,12 @@ export default function AmcEditPage() {
               <FormField control={form.control} name="endDate" render={({ field }) => (<FormItem><FormLabel>End Date</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>)} />
             </div>
             <FormField control={form.control} name="contractAmount" render={({ field }) => (<FormItem><FormLabel>Contract Amount (INR)</FormLabel><FormControl><Input type="number" min={0} value={(field.value as string) ?? ""} onChange={(e) => field.onChange(e.target.value === "" ? 0 : Number(e.target.value))} onBlur={field.onBlur} name={field.name} ref={field.ref} /></FormControl><FormMessage /></FormItem>)} />
+            {(paymentStatusWatch === "PARTIAL" || form.getValues("paymentStatus") === "PARTIAL") && (
+              <div className="grid grid-cols-2 gap-3">
+                <FormField control={form.control} name="paidAmount" render={({ field }) => (<FormItem><FormLabel>Amount Paid (INR) *</FormLabel><FormControl><Input type="number" min={0} max={Number(contractAmountWatch||0)} value={(field.value as string) ?? ""} onChange={(e) => field.onChange(e.target.value === "" ? 0 : Number(e.target.value))} placeholder="Enter paid amount" /></FormControl><FormMessage /></FormItem>)} />
+                <div><Label>Amount Left (INR)</Label><Input value={(() => { const total = Number(contractAmountWatch||form.getValues("contractAmount")||0); const paid = Number(form.watch("paidAmount")||form.getValues("paidAmount")||0); return Math.max(0, total - paid); })()} disabled className="bg-muted" /></div>
+              </div>
+            )}
             <FormField control={form.control} name="assignedEngineer" render={({ field }) => (<FormItem><FormLabel>Assigned Engineer</FormLabel><Select value={field.value || "none"} onValueChange={(v) => field.onChange(v === "none" ? "" : v)}><FormControl><SelectTrigger><SelectValue placeholder="None" /></SelectTrigger></FormControl><SelectContent><SelectItem value="none">None</SelectItem>{engineers.map((e) => <SelectItem key={e._id} value={e._id}>{e.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
             <FormField control={form.control} name="terms" render={({ field }) => (<FormItem><FormLabel>Terms</FormLabel><FormControl><Textarea {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>)} />
             <FormField control={form.control} name="status" render={({ field }) => (<FormItem><FormLabel>Status</FormLabel><Select value={field.value ?? ""} onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="ACTIVE">ACTIVE</SelectItem><SelectItem value="CANCELLED">CANCELLED</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />

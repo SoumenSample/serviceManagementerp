@@ -82,5 +82,62 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     after: { newAmcId, newStartDate: newDoc.startDate, newEndDate: newDoc.endDate } as unknown as Record<string, unknown>,
     metadata: extractRequestMeta(req) as Record<string, unknown>,
   }).catch(() => {});
+
+  // Notifications: AMC renewed — email to customer + in-app to staff
+  try {
+    const { notify } = await import("@/lib/notifications/notification-service");
+    const { amcRenewedTemplate } = await import("@/lib/notifications/templates");
+    const { getCompanySettings } = await import("@/lib/company-settings");
+    const { Customer } = await import("@/models/Customer");
+    const { Site } = await import("@/models/Site");
+    const companySettings = await getCompanySettings();
+    const customer = await Customer.findById(old.customer);
+    const site = await Site.findById(old.site);
+    const amountStr = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(newDoc.contractAmount);
+    const tpl = amcRenewedTemplate(
+      {
+        customerName: customer?.companyName || "Customer",
+        oldAmcId: old.amcId,
+        newAmcId: newDoc.amcId,
+        siteName: site?.siteName || "",
+        equipmentCount: (newDoc.equipmentIds as unknown as string[]).length,
+        newStartDate: new Date(newDoc.startDate).toLocaleDateString(),
+        newEndDate: new Date(newDoc.endDate).toLocaleDateString(),
+        contractAmount: amountStr,
+        remarks: parsed.data.remarks,
+      },
+      companySettings
+    );
+    const { User: UserModel } = await import("@/models/User");
+    const staff = await UserModel.find({ role: { $in: ["super_admin", "manager", "coordinator", "accounts"] }, isActive: true }).select("_id").lean();
+    for (const u of staff) {
+      notify({
+        eventType: "AMC_RENEWED",
+        channel: "IN_APP",
+        title: `AMC Renewed ${old.amcId} → ${newDoc.amcId}`,
+        message: `${old.amcId} renewed to ${newDoc.amcId} • ${customer?.companyName || ""} • ${site?.siteName || ""} • ${amountStr}`,
+        recipientUser: String(u._id),
+        relatedModule: "AmcContract",
+        relatedRecordId: String(newDoc._id),
+        amc: String(newDoc._id),
+        dedupKey: `AMC_RENEWED:${newDoc._id}:IN_APP:${u._id}`,
+      }).catch(() => {});
+    }
+    if (customer?.email) {
+      notify({
+        eventType: "AMC_RENEWED",
+        channel: "EMAIL",
+        title: tpl.subject,
+        message: tpl.html,
+        recipientCustomerEmail: customer.email,
+        relatedModule: "AmcContract",
+        relatedRecordId: String(newDoc._id),
+        amc: String(newDoc._id),
+        dedupKey: `AMC_RENEWED:${newDoc._id}:EMAIL:${customer.email}`,
+        email: { to: customer.email, subject: tpl.subject, html: tpl.html },
+      }).catch(() => {});
+    }
+  } catch {}
+
   return NextResponse.json({ oldAmc: old, newAmc: newDoc }, { status: 201 });
 }

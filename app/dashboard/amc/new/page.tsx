@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { amcSchema } from "@/lib/validators";
 import Link from "next/link";
 
@@ -24,7 +25,10 @@ export default function AmcNewPage() {
   const [filteredEq, setFilteredEq] = useState<{ _id: string; equipmentId: string; site: string }[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const form = useForm<any>({ resolver: zodResolver(amcSchema), defaultValues: { customer: "", site: "", amcType: "COMPREHENSIVE", paymentStatus: "NOT_BILLED", status: "ACTIVE", contractAmount: 0, equipmentIds: [], startDate: "", endDate: "", assignedEngineer: "", terms: "" } });
+  const form = useForm<any>({ resolver: zodResolver(amcSchema), defaultValues: { customer: "", site: "", amcType: "COMPREHENSIVE", paymentStatus: "NOT_BILLED", paidAmount: 0, status: "ACTIVE", contractAmount: 0, equipmentIds: [], startDate: "", endDate: "", assignedEngineer: "", terms: "" }, shouldUnregister: false });
+  const paymentStatusWatch = form.watch("paymentStatus");
+  const contractAmountWatch = form.watch("contractAmount");
+  const paidAmountWatch = form.watch("paidAmount");
 
   useEffect(() => {
     fetch("/api/customers?limit=100").then(async (r) => { if (r.ok) { const d = await r.json(); setCustomers(d.items); } });
@@ -137,6 +141,13 @@ export default function AmcNewPage() {
               </div>
 
               <FormField control={form.control} name="contractAmount" render={({ field }) => (<FormItem><FormLabel>Contract Amount (INR) *</FormLabel><FormControl><Input type="number" min={0} value={(field.value as string) ?? ""} onChange={(e) => field.onChange(e.target.value === "" ? 0 : Number(e.target.value))} onBlur={field.onBlur} name={field.name} ref={field.ref} /></FormControl><FormMessage /></FormItem>)} />
+
+              {(paymentStatusWatch === "PARTIAL" || form.getValues("paymentStatus") === "PARTIAL") && (
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField control={form.control} name="paidAmount" render={({ field }) => (<FormItem><FormLabel>Amount Paid (INR) *</FormLabel><FormControl><Input type="number" min={0} max={Number(contractAmountWatch||0)} value={(field.value as string) ?? ""} onChange={(e) => field.onChange(e.target.value === "" ? 0 : Number(e.target.value))} placeholder="Enter paid amount" /></FormControl><FormMessage /></FormItem>)} />
+                  <div><Label>Amount Left (INR)</Label><Input value={(() => { const total = Number(contractAmountWatch||form.getValues("contractAmount")||0); const paid = Number(paidAmountWatch||form.getValues("paidAmount")||0); return Math.max(0, total - paid); })()} disabled className="bg-muted" /></div>
+                </div>
+              )}
 
               <FormField control={form.control} name="assignedEngineer" render={({ field }) => {
                 const label = field.value ? engineers.find((e) => e._id === field.value)?.name : "None";

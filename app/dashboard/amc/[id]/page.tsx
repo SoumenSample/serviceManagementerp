@@ -15,7 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { AmcStatusBadge, PaymentStatusBadge, AmcTypeBadge, DaysRemainingBadge } from "@/components/amc/amc-badges";
 
 type AmcDetail = {
-  _id: string; amcId: string; amcType: string; startDate: string; endDate: string; contractAmount: number; paymentStatus: string; status: string; computedStatus: string; daysRemaining: number; terms?: string;
+  _id: string; amcId: string; amcType: string; startDate: string; endDate: string; contractAmount: number; paymentStatus: string; paidAmount?: number; status: string; computedStatus: string; daysRemaining: number; terms?: string;
   customer: { companyName: string; customerId: string; contactPerson?: string; mobile?: string; email?: string; billingAddress?: string };
   site: { siteName: string; siteId: string; siteAddress?: string; city?: string; state?: string; contactPerson?: string };
   equipmentIds: { _id: string; equipmentId: string; assetId?: string; make?: string; model?: string; serialNumber?: string; kvaCapacity?: string; equipmentStatus: string }[];
@@ -35,6 +35,8 @@ export default function AmcDetailPage() {
   const [renewAmount, setRenewAmount] = useState("");
   const [renewRemarks, setRenewRemarks] = useState("");
   const [loading, setLoading] = useState(false);
+  const [docUploading, setDocUploading] = useState(false);
+  const [docError, setDocError] = useState<string | null>(null);
 
   async function load() {
     const res = await fetch(`/api/amc/${id}`);
@@ -79,6 +81,13 @@ export default function AmcDetailPage() {
           <div className="flex justify-between"><span className="text-muted-foreground">Days Remaining</span><DaysRemainingBadge startDate={amc.startDate} endDate={amc.endDate} storedStatus={amc.status} /></div>
           <div className="flex justify-between"><span className="text-muted-foreground">Amount</span><span>{inr(amc.contractAmount)}</span></div>
           <div className="flex justify-between"><span className="text-muted-foreground">Payment</span><PaymentStatusBadge status={amc.paymentStatus} /></div>
+          {amc.paymentStatus === "PARTIAL" && (
+            <>
+              <div className="flex justify-between"><span className="text-muted-foreground">Paid Amount</span><span className="font-medium text-primary">{inr(amc.paidAmount ?? 0)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Amount Left</span><span className="font-bold text-destructive">{inr(Math.max(0, amc.contractAmount - (amc.paidAmount ?? 0)))}</span></div>
+            </>
+          )}
+          {amc.paymentStatus === "PAID" && <div className="flex justify-between"><span className="text-muted-foreground">Paid Amount</span><span className="font-medium">{inr(amc.contractAmount)}</span></div>}
           <div className="flex justify-between"><span className="text-muted-foreground">Engineer</span><span>{amc.assignedEngineer?.name || "-"}</span></div>
           <div className="flex justify-between"><span className="text-muted-foreground">Stored Status</span><Badge variant="outline">{amc.status}</Badge></div>
         </CardContent></Card>
@@ -107,7 +116,50 @@ export default function AmcDetailPage() {
 
       {amc.terms && <Card><CardHeader><CardTitle className="text-sm">Terms</CardTitle></CardHeader><CardContent><p className="text-sm whitespace-pre-wrap">{amc.terms}</p></CardContent></Card>}
 
-      <Card><CardHeader><CardTitle className="text-sm">Documents</CardTitle><CardDescription>Folder /ups-system/amc/{amc.amcId}/ — PDF/JPG/PNG/WEBP, max 5MB (future upload)</CardDescription></CardHeader><CardContent>{amc.documents.length === 0 ? <p className="text-sm text-muted-foreground">No documents yet.</p> : amc.documents.map((d, i) => <a key={i} href={d.url} target="_blank" className="text-sm underline">{d.fileName}</a>)}</CardContent></Card>
+      <Card><CardHeader><CardTitle className="text-sm">Documents</CardTitle></CardHeader><CardContent className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Input type="file" accept=".pdf,image/jpeg,image/jpg,image/png,image/webp" disabled={docUploading} onChange={async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            setDocError(null);
+            const allowed = ["application/pdf","image/jpeg","image/jpg","image/png","image/webp"];
+            if (!allowed.includes(file.type)) { setDocError(`Invalid type ${file.type}. Allowed PDF/JPG/PNG/WEBP`); return; }
+            if (file.size > 5*1024*1024) { setDocError(`File too large ${(file.size/1024/1024).toFixed(1)}MB >5MB`); return; }
+            setDocUploading(true);
+            try {
+              const fd = new FormData();
+              fd.append("file", file);
+              fd.append("folder", `ups-system/amc/${amc.amcId}/`);
+              const upRes = await fetch("/api/upload", { method: "POST", body: fd });
+              const upData = await upRes.json();
+              if (!upRes.ok) throw new Error(upData.error || "Cloudinary upload failed");
+              const docRes = await fetch(`/api/amc/${amc._id}/documents`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: upData.url, publicId: upData.publicId, fileName: file.name, resourceType: file.type }) });
+              const docData = await docRes.json();
+              if (!docRes.ok) throw new Error(docData.error || "Save document failed");
+              await load();
+            } catch (err) { setDocError(err instanceof Error ? err.message : String(err)); }
+            finally { setDocUploading(false); e.target.value = ""; }
+          }} className="max-w-sm" />
+          {docUploading && <span className="text-xs text-muted-foreground">Uploading to Cloudinary...</span>}
+        </div>
+        {docError && <p className="text-xs text-destructive">{docError}</p>}
+        {amc.documents.length === 0 ? <p className="text-sm text-muted-foreground">No documents yet.</p> : (
+          <div className="space-y-2">
+            {amc.documents.map((d: { url: string; fileName: string; publicId?: string }, i: number) => (
+              <div key={i} className="flex items-center justify-between border rounded-md px-3 py-2 text-sm">
+                <a href={d.url} target="_blank" rel="noopener" className="underline truncate mr-2">{d.fileName}</a>
+                <Button variant="outline" size="xs" onClick={async () => {
+                  if (!confirm(`Delete ${d.fileName}?`)) return;
+                  const pid = (d as unknown as { publicId: string }).publicId;
+                  if (!pid) return alert("Missing publicId");
+                  const res = await fetch(`/api/amc/${amc._id}/documents?publicId=${encodeURIComponent(pid)}`, { method: "DELETE" });
+                  if (res.ok) load(); else alert("Delete failed: " + JSON.stringify(await res.json()));
+                }}>Delete</Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent></Card>
 
       <Card><CardHeader><CardTitle className="text-sm">Renewal History</CardTitle><CardDescription>Old AMC remains — never destroyed on renewal</CardDescription></CardHeader><CardContent>
         {amc.renewalHistory.length === 0 ? <p className="text-sm text-muted-foreground">No renewals yet.</p> : (

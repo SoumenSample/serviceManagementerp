@@ -70,7 +70,7 @@ export default function SitesPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Sites" description="Site master — each site belongs to a customer and can have multiple UPS/Inverters" action={<Button onClick={onAdd}>Add Site</Button>} />
+      <PageHeader title="Sites" description="View and Manage Sites" action={<Button onClick={onAdd}>Add Site</Button>} />
       <Card><CardContent className="pt-6 space-y-4">
         <Input placeholder="Search site name, ID, city..." value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} className="max-w-sm" />
         {items.length === 0 ? <EmptyState title="No sites" description="Add your first site" /> : (

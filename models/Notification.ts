@@ -11,6 +11,8 @@ export const NOTIFICATION_EVENTS = [
   "CALL_CLOSED",
   "AMC_EXPIRING",
   "AMC_EXPIRED",
+  "AMC_CREATED",
+  "AMC_RENEWED",
 ] as const;
 
 export const NOTIFICATION_CHANNELS = ["IN_APP", "EMAIL"] as const;
@@ -33,6 +35,8 @@ export interface INotification extends Document {
   isRead: boolean;
   readAt?: Date;
   dedupKey?: string;
+  isDeleted?: boolean;
+  deletedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -55,11 +59,14 @@ const NotificationSchema = new Schema<INotification>(
     isRead: { type: Boolean, default: false, index: true },
     readAt: Date,
     dedupKey: { type: String, index: true, sparse: true },
+    isDeleted: { type: Boolean, default: false, index: true },
+    deletedAt: Date,
   },
   { timestamps: true }
 );
 
 NotificationSchema.index({ recipientUser: 1, isRead: 1, createdAt: -1 });
+NotificationSchema.index({ recipientUser: 1, isDeleted: 1, createdAt: -1 });
 NotificationSchema.index({ dedupKey: 1 }, { unique: true, sparse: true });
 
 export const Notification: Model<INotification> =

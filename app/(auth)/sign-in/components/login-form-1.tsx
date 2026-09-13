@@ -58,6 +58,7 @@ export function LoginForm1({
       setServerError(data.error || "Login failed")
       return
     }
+    sessionStorage.setItem("welcome_pending", "1")
     const next = searchParams.get("next") || "/dashboard"
     router.push(next)
     router.refresh()

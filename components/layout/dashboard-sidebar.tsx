@@ -80,8 +80,8 @@ const navConfig: { label: string; items: { title: string; url: string; icon: typ
     items: [
       { title: "Finance", url: "/dashboard/finance", icon: Receipt, perm: "finance.view" },
       { title: "Invoices", url: "/dashboard/invoices", icon: Receipt, perm: "invoice.view" },
-      { title: "Expenses", url: "/dashboard/expenses", icon: Receipt, perm: "expense.view" },
       { title: "Payments", url: "/dashboard/payments", icon: Receipt, perm: "payment.view" },
+      { title: "Expenses", url: "/dashboard/expenses", icon: Receipt, perm: "expense.view" },
     ],
   },
   {

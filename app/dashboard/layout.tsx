@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { GlobalSearch } from "@/components/search/global-search";
 import { GlobalEngineerTracker } from "@/components/engineer/global-tracker";
+import { WelcomeModal } from "@/components/layout/welcome-modal";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
@@ -43,6 +44,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         </SidebarInset>
       </SidebarProvider>
       <GlobalEngineerTracker role={sidebarUser.role} />
+      <WelcomeModal user={sidebarUser} />
     </TooltipProvider>
   );
 }

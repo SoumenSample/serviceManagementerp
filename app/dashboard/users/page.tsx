@@ -17,6 +17,16 @@ import Link from "next/link";
 
 type User = { _id: string; name: string; email: string; role: string; mobile?: string; isActive: boolean; createdAt: string };
 
+function canEditTarget(editorRole: string, targetRole: string, editorId: string, targetId: string): boolean {
+  if (String(editorId) === String(targetId)) return true;
+  if (editorRole === "super_admin") return true;
+  if (editorRole === "manager") {
+    if (targetRole === "super_admin") return false;
+    return ["manager", "coordinator", "engineer", "accounts"].includes(targetRole);
+  }
+  return false;
+}
+
 export default function UsersPage() {
   const [items, setItems] = useState<User[]>([]);
   const [q, setQ] = useState("");
@@ -26,6 +36,7 @@ export default function UsersPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [me, setMe] = useState<{ sub: string; role: string } | null>(null);
   const form = useForm<any>({ resolver: zodResolver(createUserSchema), defaultValues: { role: "engineer", isActive: true } });
 
   async function load() {
@@ -38,10 +49,18 @@ export default function UsersPage() {
     else if (res.status === 403) alert("Forbidden: users.manage required");
   }
   useEffect(() => { load(); }, [q, role, active, page]);
+  useEffect(() => {
+    fetch("/api/auth/me").then(async (r) => {
+      if (r.ok) {
+        const d = await r.json();
+        if (d.user) setMe({ sub: d.user.sub, role: d.user.role });
+      }
+    });
+  }, []);
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Users & Roles" description="Create engineer for Phase 6 testing • role is source of authorization" action={<Button onClick={() => setOpen(true)}>Create User</Button>} />
+      <PageHeader title="Users & Roles" description="View and manage users and their roles" action={<Button onClick={() => setOpen(true)}>Create User</Button>} />
       <Card><CardContent className="pt-6 space-y-4">
         <div className="flex flex-wrap gap-2">
           <Input placeholder="Search name, email, phone..." value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} className="max-w-xs" />
@@ -51,14 +70,16 @@ export default function UsersPage() {
         {items.length === 0 ? <EmptyState title="No users" description="Create first user" /> : (
           <Table>
             <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Phone</TableHead><TableHead>Status</TableHead><TableHead>Created</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
-            <TableBody>{items.map((u) => (
+            <TableBody>{items.map((u) => {
+              const canEdit = me ? canEditTarget(me.role, u.role, me.sub, u._id) : false;
+              return (
               <TableRow key={u._id}>
-                <TableCell className="font-medium">{u.name}</TableCell><TableCell className="text-xs">{u.email}</TableCell><TableCell><Badge variant="outline">{u.role}</Badge></TableCell><TableCell className="text-xs">{u.mobile || "-"}</TableCell><TableCell><Badge variant={u.isActive ? "default" : "secondary"}>{u.isActive ? "Active" : "Inactive"}</Badge></TableCell><TableCell className="text-xs">{new Date(u.createdAt).toLocaleDateString()}</TableCell><TableCell className="flex gap-1"><Link href={`/dashboard/users/${u._id}`}><Button size="xs" variant="outline">View</Button></Link><Button size="xs" variant={u.isActive ? "destructive" : "default"} onClick={async () => {
+                <TableCell className="font-medium">{u.name}</TableCell><TableCell className="text-xs">{u.email}</TableCell><TableCell><Badge variant="outline">{u.role}</Badge></TableCell><TableCell className="text-xs">{u.mobile || "-"}</TableCell><TableCell><Badge variant={u.isActive ? "default" : "secondary"}>{u.isActive ? "Active" : "Inactive"}</Badge></TableCell><TableCell className="text-xs">{new Date(u.createdAt).toLocaleDateString()}</TableCell><TableCell className="flex gap-1"><Link href={`/dashboard/users/${u._id}`}><Button size="xs" variant="outline">View</Button></Link><Button size="xs" variant={u.isActive ? "destructive" : "default"} disabled={!canEdit} title={!canEdit ? "No permission to edit this profile" : undefined} onClick={async () => {
                   const res = await fetch(`/api/users/${u._id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ isActive: !u.isActive }) });
                   if (res.ok) load(); else alert("Failed: " + JSON.stringify(await res.json()));
                 }}>{u.isActive ? "Deactivate" : "Activate"}</Button></TableCell>
               </TableRow>
-            ))}</TableBody>
+            );})}</TableBody>
           </Table>
         )}
         <div className="flex justify-between items-center"><span className="text-sm text-muted-foreground">Page {page} of {totalPages}</span><div className="flex gap-2"><Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Prev</Button><Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>Next</Button></div></div>
@@ -74,7 +95,7 @@ export default function UsersPage() {
               <FormField control={form.control} name="name" render={({ field }) => (<FormItem><FormLabel>Name *</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
               <FormField control={form.control} name="email" render={({ field }) => (<FormItem><FormLabel>Email *</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem>)} />
               <FormField control={form.control} name="mobile" render={({ field }) => (<FormItem><FormLabel>Phone</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-              <FormField control={form.control} name="role" render={({ field }) => (<FormItem><FormLabel>Role *</FormLabel><Select value={field.value ?? ""} onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="super_admin">super_admin</SelectItem><SelectItem value="manager">manager</SelectItem><SelectItem value="coordinator">coordinator</SelectItem><SelectItem value="engineer">engineer</SelectItem><SelectItem value="accounts">accounts</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
+              <FormField control={form.control} name="role" render={({ field }) => (<FormItem><FormLabel>Role *</FormLabel><Select value={field.value ?? ""} onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{me?.role === "super_admin" && <SelectItem value="super_admin">super_admin</SelectItem>}<SelectItem value="manager">manager</SelectItem><SelectItem value="coordinator">coordinator</SelectItem><SelectItem value="engineer">engineer</SelectItem><SelectItem value="accounts">accounts</SelectItem></SelectContent></Select>{me?.role === "manager" && <p className="text-xs text-muted-foreground">Manager cannot create super_admin</p>}<FormMessage /></FormItem>)} />
               <div className="grid grid-cols-2 gap-3">
                 <FormField control={form.control} name="password" render={({ field }) => (<FormItem><FormLabel>Password *</FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></FormItem>)} />
                 <FormField control={form.control} name="confirmPassword" render={({ field }) => (<FormItem><FormLabel>Confirm *</FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></FormItem>)} />

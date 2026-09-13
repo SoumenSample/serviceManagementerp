@@ -13,12 +13,59 @@ export async function GET(req: Request) {
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!hasPermission(auth.role, "payment.view") && !hasPermission(auth.role, "finance.view")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const { searchParams } = new URL(req.url);
+  const q = searchParams.get("q")?.trim();
   const invoice = searchParams.get("invoice");
+  const customer = searchParams.get("customer");
+  const paymentMethod = searchParams.get("paymentMethod");
+  const from = searchParams.get("from");
+  const to = searchParams.get("to");
+  const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
+  const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "10")));
+  const skip = (page - 1) * limit;
   await connectDB();
   const filter: Record<string, unknown> = {};
   if (invoice) filter.invoice = invoice;
-  const items = await Payment.find(filter).populate("invoice", "invoiceId").populate("customer", "companyName").sort({ createdAt: -1 }).lean();
-  return NextResponse.json({ items });
+  if (customer) filter.customer = customer;
+  if (paymentMethod) filter.paymentMethod = paymentMethod;
+  if (from || to) {
+    const dateFilter: Record<string, unknown> = {};
+    if (from) dateFilter.$gte = new Date(from);
+    if (to) {
+      const end = new Date(to);
+      end.setHours(23, 59, 59, 999);
+      dateFilter.$lte = end;
+    }
+    filter.paymentDate = dateFilter;
+  }
+  if (q) {
+    // Cheap server-side search on indexed fields; invoiceId/customer search handled via lookup below
+    const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = { $regex: escaped, $options: "i" };
+    // For invoiceId/customer text search we need to resolve ids first
+    const [invIds, custIds] = await Promise.all([
+      Invoice.find({ invoiceId: regex }).select("_id").limit(20).lean().then((r) => r.map((x: unknown) => (x as { _id: unknown })._id)),
+      (await import("@/models/Customer")).Customer.find({ $or: [{ companyName: regex }, { customerId: regex }] }).select("_id").limit(20).lean().then((r) => r.map((x: unknown) => (x as { _id: unknown })._id)),
+    ]);
+    const or: Record<string, unknown>[] = [{ paymentId: regex }, { referenceNumber: regex }];
+    if (invIds.length) or.push({ invoice: { $in: invIds } });
+    if (custIds.length) or.push({ customer: { $in: custIds } });
+    filter.$or = or;
+  }
+
+  const [items, total] = await Promise.all([
+    Payment.find(filter)
+      .populate("invoice", "invoiceId totalAmount paidAmount paymentStatus dueDate")
+      .populate("customer", "companyName customerId")
+      .populate("receivedBy", "name email")
+      .sort({ paymentDate: -1, createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    Payment.countDocuments(filter),
+  ]);
+
+  // Enrich with derived customer/invoice display helpers (already populated)
+  return NextResponse.json({ items, total, page, limit, totalPages: Math.ceil(total / limit) });
 }
 
 export async function POST(req: Request) {

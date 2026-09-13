@@ -268,7 +268,7 @@ export default function ServiceCallDetailPage() {
                 <Button size="xs" variant="outline" onClick={async () => {
                   const res = await fetch(`/api/service-calls/${id}/request-closure-otp`, { method: "POST" });
                   const j = await res.json();
-                  if (res.ok) { setOtpSent(true); alert(j.devCode ? `OTP (dev): ${j.devCode} expires ${new Date(j.expiresAt).toLocaleTimeString()}` : "OTP sent to customer email"); } else alert("Failed: " + JSON.stringify(j));
+                  if (res.ok) { setOtpSent(true); } else alert("Failed: " + JSON.stringify(j));
                 }}>Request Closure OTP</Button>
                 <Input placeholder="Enter 6-digit OTP" value={otp} onChange={(e) => setOtp(e.target.value)} className="w-[140px]" />
                 <Button size="xs" disabled={!otp} onClick={async () => {

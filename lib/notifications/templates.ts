@@ -93,3 +93,53 @@ export function amcExpiringTemplate(
   const html = `<p>Dear ${escapeHtml(data.customerName)},</p><p>Your AMC ${escapeHtml(data.amcId)} expires on ${escapeHtml(data.endDate)} (${data.days} days). Please renew.</p>${footer}`;
   return { subject, html };
 }
+
+export function amcCreatedTemplate(
+  data: { customerName: string; amcId: string; amcType: string; siteName: string; equipmentCount: number; startDate: string; endDate: string; contractAmount: string; paymentStatus: string; paidAmount?: string; remainingAmount?: string },
+  company: CompanySettings = DEFAULT_COMPANY_SETTINGS
+) {
+  const subject = `AMC Created – ${escapeHtml(data.amcId)} for ${escapeHtml(data.customerName)}`;
+  const footer = brandFooter(company);
+  const paidLine = data.paymentStatus === "PARTIAL" ? `<li>Paid: ${escapeHtml(data.paidAmount || "")} • Remaining: ${escapeHtml(data.remainingAmount || "")}</li>` : "";
+  const html = `
+<p>Dear ${escapeHtml(data.customerName)},</p>
+<p>Your AMC has been created successfully.</p>
+<p><strong>AMC Details</strong></p>
+<ul>
+<li>AMC ID: ${escapeHtml(data.amcId)}</li>
+<li>Type: ${escapeHtml(data.amcType)}</li>
+<li>Site: ${escapeHtml(data.siteName)}</li>
+<li>Equipment Covered: ${data.equipmentCount}</li>
+<li>Period: ${escapeHtml(data.startDate)} to ${escapeHtml(data.endDate)}</li>
+<li>Contract Amount: ${escapeHtml(data.contractAmount)}</li>
+<li>Payment Status: ${escapeHtml(data.paymentStatus)}</li>
+${paidLine}
+</ul>
+${footer}
+`;
+  return { subject, html, text: `AMC ${data.amcId} created for ${data.customerName}` };
+}
+
+export function amcRenewedTemplate(
+  data: { customerName: string; oldAmcId: string; newAmcId: string; siteName: string; equipmentCount: number; newStartDate: string; newEndDate: string; contractAmount: string; remarks?: string },
+  company: CompanySettings = DEFAULT_COMPANY_SETTINGS
+) {
+  const subject = `AMC Renewed – ${escapeHtml(data.oldAmcId)} → ${escapeHtml(data.newAmcId)}`;
+  const footer = brandFooter(company);
+  const html = `
+<p>Dear ${escapeHtml(data.customerName)},</p>
+<p>Your AMC has been renewed successfully.</p>
+<p><strong>Renewal Details</strong></p>
+<ul>
+<li>Previous AMC: ${escapeHtml(data.oldAmcId)}</li>
+<li>New AMC: ${escapeHtml(data.newAmcId)}</li>
+<li>Site: ${escapeHtml(data.siteName)}</li>
+<li>Equipment Covered: ${data.equipmentCount}</li>
+<li>New Period: ${escapeHtml(data.newStartDate)} to ${escapeHtml(data.newEndDate)}</li>
+<li>Contract Amount: ${escapeHtml(data.contractAmount)}</li>
+${data.remarks ? `<li>Remarks: ${escapeHtml(data.remarks)}</li>` : ""}
+</ul>
+${footer}
+`;
+  return { subject, html, text: `AMC ${data.oldAmcId} renewed to ${data.newAmcId}` };
+}

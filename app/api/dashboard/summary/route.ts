@@ -26,14 +26,16 @@ export async function GET() {
 
   // AMC stats (all roles can see AMC overview)
   const amcs = await AmcContract.find({ status: { $nin: ["CANCELLED", "RENEWED"] } }).select("startDate endDate status").lean();
-  let amcActive = 0, amc15 = 0, amc30 = 0, amcExpired = 0;
+  let amcActiveExclusive = 0, amc15 = 0, amc30 = 0, amcExpired = 0;
   for (const a of amcs as unknown as { startDate: string; endDate: string; status: string }[]) {
     const c = getComputedAmcStatus(a.startDate, a.endDate, a.status as never);
-    if (c === "ACTIVE") amcActive++;
+    if (c === "ACTIVE") amcActiveExclusive++;
     else if (c === "EXPIRING_15") amc15++;
     else if (c === "EXPIRING_30") amc30++;
     else if (c === "EXPIRED") amcExpired++;
   }
+  // Active = total currently valid (ACTIVE + expiring soon) — user expectation is that expiring contracts are still active
+  const amcActive = amcActiveExclusive + amc15 + amc30;
 
   // Inventory alerts (all)
   const invs = await Inventory.find().populate("part", "minimumStockLevel").lean();

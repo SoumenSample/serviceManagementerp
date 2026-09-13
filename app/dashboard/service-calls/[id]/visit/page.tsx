@@ -20,6 +20,7 @@ export default function VisitWorkflowPage() {
   const params = useParams<{ id: string }>();
   const serviceCallId = params.id;
   const router = useRouter();
+  const [callId, setCallId] = useState<string>("");
   const [visits, setVisits] = useState<Visit[]>([]);
   const [selected, setSelected] = useState<Visit | null>(null);
   const [gps, setGps] = useState<{ lat?: number; lng?: number; acc?: number; err?: string; loading?: boolean }>({});
@@ -64,6 +65,9 @@ export default function VisitWorkflowPage() {
     const res = await fetch(`/api/part-requests?limit=100`);
     if (res.ok) { const d = await res.json(); setPartRequests(d.items.filter((r: { serviceVisit: string | { _id: string } }) => String(typeof r.serviceVisit === "object" ? (r.serviceVisit as { _id: string })._id : r.serviceVisit) === String(selected._id))); }
   }
+  useEffect(() => {
+    fetch(`/api/service-calls/${serviceCallId}`).then(async (r) => { if (r.ok) { const d = await r.json(); setCallId(d.callId || ""); } });
+  }, [serviceCallId]);
   useEffect(() => { loadVisits(); loadParts(); loadEngineers(); }, [serviceCallId]);
   useEffect(() => { loadPartRequests(); }, [selected]);
 
@@ -103,24 +107,38 @@ export default function VisitWorkflowPage() {
   async function completeVisit() {
     if (!selected) return;
     if (!signature && !sigReason) return alert("Signature or reason required");
+    if (!callId) return alert("Service call not loaded yet");
     setLoading(true);
-    const payload: Record<string, unknown> = {
-      completionLatitude: gps.lat,
-      completionLongitude: gps.lng,
-      completionGpsAccuracy: gps.acc,
-      diagnosis: form.getValues("diagnosis"),
-      workDone: form.getValues("workDone"),
-      problemFound: form.getValues("problemFound"),
-      equipmentCondition: form.getValues("equipmentCondition"),
-      engineerRemarks: form.getValues("engineerRemarks"),
-      beforePhotos: beforePhotos.length ? beforePhotos : undefined,
-      afterPhotos: afterPhotos.length ? afterPhotos : undefined,
-      customerSignature: signature ? { url: signature, publicId: `sig-${Date.now()}` } : undefined,
-      signatureReason: sigReason || undefined,
-    };
-    const res = await fetch(`/api/service-visits/${selected._id}/complete`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-    setLoading(false);
-    if (res.ok) { const doc = await res.json(); setSelected(doc); loadVisits(); alert("Visit COMPLETED"); } else alert("Complete failed: " + JSON.stringify(await res.json()));
+    try {
+      let sigMeta: { url: string; publicId: string } | undefined;
+      if (signature) {
+        const fd = new FormData();
+        fd.append("dataUrl", signature);
+        fd.append("folder", `ups-system/signatures/${callId}`);
+        const r = await fetch("/api/upload", { method: "POST", body: fd });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || "Signature upload failed");
+        sigMeta = { url: d.url, publicId: d.publicId };
+      }
+      const payload: Record<string, unknown> = {
+        completionLatitude: gps.lat,
+        completionLongitude: gps.lng,
+        completionGpsAccuracy: gps.acc,
+        diagnosis: form.getValues("diagnosis"),
+        workDone: form.getValues("workDone"),
+        problemFound: form.getValues("problemFound"),
+        equipmentCondition: form.getValues("equipmentCondition"),
+        engineerRemarks: form.getValues("engineerRemarks"),
+        beforePhotos: beforePhotos.length ? beforePhotos : undefined,
+        afterPhotos: afterPhotos.length ? afterPhotos : undefined,
+        customerSignature: sigMeta || undefined,
+        signatureReason: sigReason || undefined,
+      };
+      const res = await fetch(`/api/service-visits/${selected._id}/complete`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      if (res.ok) { const doc = await res.json(); setSelected(doc); setBeforePhotos([]); setAfterPhotos([]); setSignature(null); loadVisits(); alert("Visit COMPLETED — photos & signature stored in Cloudinary"); } else alert("Complete failed: " + JSON.stringify(await res.json()));
+    } catch (e) {
+      alert(e instanceof Error ? e.message : String(e));
+    } finally { setLoading(false); }
   }
 
   return (
@@ -191,9 +209,11 @@ export default function VisitWorkflowPage() {
                 </form>
               </Form>
 
-              <PhotoUploader label="Before Photos" folder={`ups-system/service-calls/${serviceCallId}/${selected.visitId}/before`} onUploaded={(m) => setBeforePhotos((p) => [...p, m])} />
-              {beforePhotos.length > 0 && <p className="text-xs text-green-600">✓ {beforePhotos.length} before photo(s) uploaded</p>}
-              <PhotoUploader label="After Photos" folder={`ups-system/service-calls/${serviceCallId}/${selected.visitId}/after`} onUploaded={(m) => setAfterPhotos((p) => [...p, m])} />
+              {!callId ? <p className="text-xs text-muted-foreground">Loading service call for Cloudinary folder…</p> : <>
+                <PhotoUploader label="Before Photos" folder={`ups-system/service-calls/${callId}/${selected.visitId}/before`} onUploaded={(m) => setBeforePhotos((p) => [...p, m])} />
+                {beforePhotos.length > 0 && <p className="text-xs text-green-600">✓ {beforePhotos.length} before photo(s) uploaded to Cloudinary</p>}
+                <PhotoUploader label="After Photos" folder={`ups-system/service-calls/${callId}/${selected.visitId}/after`} onUploaded={(m) => setAfterPhotos((p) => [...p, m])} />
+              </>}
               {afterPhotos.length > 0 && <p className="text-xs text-green-600">✓ {afterPhotos.length} after photo(s) uploaded</p>}
 
               <div className="border rounded-md p-3 space-y-2">
@@ -211,7 +231,7 @@ export default function VisitWorkflowPage() {
               </div>
 
               <div className="border rounded-md p-3 space-y-2">
-                <p className="text-sm font-medium">Customer Signature → /ups-system/signatures/{serviceCallId}/</p>
+                <p className="text-sm font-medium">Customer Signature → Cloudinary /ups-system/signatures/{callId || serviceCallId}/</p>
                 <SignaturePad onSave={setSignature} />
                 {signature && <p className="text-xs text-green-600">✓ Signature captured</p>}
                 <Select value={sigReason} onValueChange={(v) => setSigReason(v as string)}><SelectTrigger><SelectValue placeholder="Or reason if no signature" /></SelectTrigger><SelectContent><SelectItem value="CUSTOMER_UNAVAILABLE">CUSTOMER_UNAVAILABLE</SelectItem><SelectItem value="CUSTOMER_REFUSED">CUSTOMER_REFUSED</SelectItem><SelectItem value="SITE_CLOSED">SITE_CLOSED</SelectItem><SelectItem value="OTHER">OTHER</SelectItem></SelectContent></Select>

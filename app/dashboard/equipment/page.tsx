@@ -63,7 +63,7 @@ export default function EquipmentPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Equipment" description="UPS/Inverter assets — immutable Equipment ID, transfer via movement history" action={<Button onClick={onAdd}>Add Equipment</Button>} />
+      <PageHeader title="Equipment" description="View and Manage Equipment" action={<Button onClick={onAdd}>Add Equipment</Button>} />
       <Card><CardContent className="pt-6 space-y-4">
         <Input placeholder="Search Equipment ID, Asset ID, Serial, Make..." value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} className="max-w-sm" />
         {items.length === 0 ? <EmptyState title="No equipment" description="Add your first UPS/Inverter" /> : (

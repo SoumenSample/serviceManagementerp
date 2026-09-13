@@ -61,21 +61,45 @@ const amcBaseSchema = z.object({
   endDate: z.string().min(1, "End date required"),
   contractAmount: z.coerce.number().min(0, "Amount cannot be negative"),
   paymentStatus: z.enum(["NOT_BILLED", "INVOICED", "PARTIAL", "PAID", "OVERDUE"]).default("NOT_BILLED"),
+  paidAmount: z.coerce.number().min(0, "Paid amount cannot be negative").default(0).optional(),
   assignedEngineer: z.string().optional().or(z.literal("")),
   terms: z.string().optional(),
   status: z.enum(["ACTIVE", "EXPIRED", "CANCELLED", "RENEWED"]).default("ACTIVE"),
 });
 
-export const amcSchema = amcBaseSchema.refine((data) => new Date(data.endDate) >= new Date(data.startDate), { message: "End date must not be before start date", path: ["endDate"] });
+export const amcSchema = amcBaseSchema
+  .refine((data) => new Date(data.endDate) >= new Date(data.startDate), { message: "End date must not be before start date", path: ["endDate"] })
+  .superRefine((data, ctx) => {
+    const paid = Number(data.paidAmount ?? 0);
+    const total = Number(data.contractAmount ?? 0);
+    if (data.paymentStatus === "PARTIAL") {
+      if (!paid || paid <= 0) ctx.addIssue({ code: "custom", message: "Paid amount required for PARTIAL status", path: ["paidAmount"] });
+      else if (paid >= total) ctx.addIssue({ code: "custom", message: "Paid amount must be less than contract amount for PARTIAL", path: ["paidAmount"] });
+    }
+    if (paid > total) ctx.addIssue({ code: "custom", message: "Paid amount cannot exceed contract amount", path: ["paidAmount"] });
+    if (data.paymentStatus === "PAID" && paid !== 0 && paid !== total) ctx.addIssue({ code: "custom", message: "For PAID status, paid amount should be 0 or equal to contract amount", path: ["paidAmount"] });
+  });
 
 // Partial version for PATCH/PUT edits - Zod .partial() cannot be used on schemas with .refine(), so derive from base
-export const amcUpdateSchema = amcBaseSchema.partial().refine(
-  (data) => {
-    if (data.startDate && data.endDate) return new Date(data.endDate) >= new Date(data.startDate);
-    return true;
-  },
-  { message: "End date must not be before start date", path: ["endDate"] }
-);
+export const amcUpdateSchema = amcBaseSchema.partial()
+  .refine(
+    (data) => {
+      if (data.startDate && data.endDate) return new Date(data.endDate) >= new Date(data.startDate);
+      return true;
+    },
+    { message: "End date must not be before start date", path: ["endDate"] }
+  )
+  .superRefine((data, ctx) => {
+    if (data.paidAmount !== undefined && data.contractAmount !== undefined) {
+      const paid = Number(data.paidAmount ?? 0);
+      const total = Number(data.contractAmount ?? 0);
+      if (paid > total) ctx.addIssue({ code: "custom", message: "Paid amount cannot exceed contract amount", path: ["paidAmount"] });
+    }
+    if (data.paymentStatus === "PARTIAL" && data.paidAmount !== undefined) {
+      const paid = Number(data.paidAmount ?? 0);
+      if (!paid || paid <= 0) ctx.addIssue({ code: "custom", message: "Paid amount required for PARTIAL status", path: ["paidAmount"] });
+    }
+  });
 
 export const amcRenewSchema = z.object({
   newStartDate: z.string().min(1),

@@ -67,7 +67,7 @@ function PendingCallsSection({ pendingList }: { pendingList: { _id: string; call
 
 function SLASection({ overdue, avgResponse, avgResolution }: { overdue: number; avgResponse: number | null; avgResolution: number | null }) {
   return (
-    <Card><CardHeader><CardTitle className="text-sm">SLA Summary</CardTitle><CardDescription>Overdue • Avg Response (complaint→visit) • Avg Resolution (complaint→closed)</CardDescription></CardHeader><CardContent className="grid grid-cols-3 gap-4 text-sm">
+    <Card><CardHeader><CardTitle className="text-sm">SLA Summary</CardTitle></CardHeader><CardContent className="grid grid-cols-3 gap-4 text-sm">
       <div><p className="text-muted-foreground">Overdue Calls</p><p className="text-xl font-bold text-destructive">{overdue}</p></div>
       <div><p className="text-muted-foreground">Avg Response</p><p className="text-xl font-bold">{avgResponse !== null ? `${avgResponse.toFixed(1)} days` : "—"}</p></div>
       <div><p className="text-muted-foreground">Avg Resolution</p><p className="text-xl font-bold">{avgResolution !== null ? `${avgResolution.toFixed(1)} days` : "—"}</p></div>

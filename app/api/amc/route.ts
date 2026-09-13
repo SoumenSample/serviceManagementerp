@@ -140,6 +140,10 @@ export async function POST(req: Request) {
   }
 
   const amcId = await genAmcId();
+  let paidAmount = Number(parsed.data.paidAmount ?? 0);
+  if (parsed.data.paymentStatus === "PAID") paidAmount = parsed.data.contractAmount;
+  if (paidAmount > parsed.data.contractAmount) return NextResponse.json({ error: "Paid amount cannot exceed contract amount" }, { status: 400 });
+  if (parsed.data.paymentStatus === "PARTIAL" && (!paidAmount || paidAmount <= 0 || paidAmount >= parsed.data.contractAmount)) return NextResponse.json({ error: "For PARTIAL, paid amount must be >0 and < contract amount" }, { status: 400 });
   const doc = await AmcContract.create({
     amcId,
     customer: parsed.data.customer,
@@ -150,6 +154,7 @@ export async function POST(req: Request) {
     endDate: new Date(parsed.data.endDate),
     contractAmount: parsed.data.contractAmount,
     paymentStatus: parsed.data.paymentStatus,
+    paidAmount,
     assignedEngineer: parsed.data.assignedEngineer || undefined,
     terms: parsed.data.terms,
     status: parsed.data.status,
@@ -171,5 +176,64 @@ export async function POST(req: Request) {
     after: { amcId, amcType: parsed.data.amcType, customer: parsed.data.customer } as unknown as Record<string, unknown>,
     metadata: extractRequestMeta(req) as Record<string, unknown>,
   }).catch(() => {});
+
+  // Notifications: AMC created — email to customer + in-app to staff
+  try {
+    const { notify } = await import("@/lib/notifications/notification-service");
+    const { amcCreatedTemplate } = await import("@/lib/notifications/templates");
+    const { getCompanySettings } = await import("@/lib/company-settings");
+    const companySettings = await getCompanySettings();
+    const amountStr = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(parsed.data.contractAmount);
+    const paidStr = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(paidAmount);
+    const remainingStr = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(Math.max(0, parsed.data.contractAmount - paidAmount));
+    const tpl = amcCreatedTemplate(
+      {
+        customerName: customer.companyName,
+        amcId,
+        amcType: parsed.data.amcType,
+        siteName: site.siteName,
+        equipmentCount: parsed.data.equipmentIds.length,
+        startDate: new Date(parsed.data.startDate).toLocaleDateString(),
+        endDate: new Date(parsed.data.endDate).toLocaleDateString(),
+        contractAmount: amountStr,
+        paymentStatus: parsed.data.paymentStatus,
+        paidAmount: paidStr,
+        remainingAmount: remainingStr,
+      },
+      companySettings
+    );
+    // In-app to super_admin/manager/coordinator/accounts
+    const { User: UserModel } = await import("@/models/User");
+    const staff = await UserModel.find({ role: { $in: ["super_admin", "manager", "coordinator", "accounts"] }, isActive: true }).select("_id").lean();
+    for (const u of staff) {
+      notify({
+        eventType: "AMC_CREATED",
+        channel: "IN_APP",
+        title: `New AMC ${amcId}`,
+        message: `${amcId} • ${customer.companyName} • ${site.siteName} • ${parsed.data.amcType} • ${amountStr} • ${parsed.data.paymentStatus}${parsed.data.paymentStatus === "PARTIAL" ? ` • Paid ${paidStr} • Due ${remainingStr}` : ""}`,
+        recipientUser: String(u._id),
+        relatedModule: "AmcContract",
+        relatedRecordId: String(doc._id),
+        amc: String(doc._id),
+        dedupKey: `AMC_CREATED:${doc._id}:IN_APP:${u._id}`,
+      }).catch(() => {});
+    }
+    // Email to customer if available
+    if (customer.email) {
+      notify({
+        eventType: "AMC_CREATED",
+        channel: "EMAIL",
+        title: tpl.subject,
+        message: tpl.html,
+        recipientCustomerEmail: customer.email,
+        relatedModule: "AmcContract",
+        relatedRecordId: String(doc._id),
+        amc: String(doc._id),
+        dedupKey: `AMC_CREATED:${doc._id}:EMAIL:${customer.email}`,
+        email: { to: customer.email, subject: tpl.subject, html: tpl.html },
+      }).catch(() => {});
+    }
+  } catch {}
+
   return NextResponse.json(doc, { status: 201 });
 }

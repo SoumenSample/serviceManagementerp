@@ -11,14 +11,14 @@ export async function GET() {
   if (!hasPermission(auth.role, "amc.view")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   await connectDB();
   const all = await AmcContract.find({ status: { $nin: ["CANCELLED", "RENEWED"] } }).select("startDate endDate status").lean();
-  let active = 0, expiring15 = 0, expiring30 = 0, expired = 0;
+  let activeExclusive = 0, expiring15 = 0, expiring30 = 0, expired = 0;
   for (const doc of all as unknown as { startDate: string; endDate: string; status: string }[]) {
     const computed = getComputedAmcStatus(doc.startDate, doc.endDate, doc.status as never);
-    if (computed === "ACTIVE") active++;
+    if (computed === "ACTIVE") activeExclusive++;
     else if (computed === "EXPIRING_15") expiring15++;
     else if (computed === "EXPIRING_30") expiring30++;
     else if (computed === "EXPIRED") expired++;
   }
-  // Provide both mutually exclusive buckets and legacy 30-days inclusive for clarity
-  return NextResponse.json({ active, expiring15, expiring30, expiring30Inclusive: expiring15 + expiring30, expired, total: all.length });
+  const active = activeExclusive + expiring15 + expiring30; // total currently valid
+  return NextResponse.json({ active, activeExclusive, expiring15, expiring30, expiring30Inclusive: expiring15 + expiring30, expired, total: all.length });
 }

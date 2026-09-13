@@ -34,8 +34,6 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   const equipment = sc.equipment ? await (await import("@/models/Equipment")).Equipment.findById(sc.equipment) : null;
   const engineer = sc.assignedEngineer ? await (await import("@/models/User")).User.findById(sc.assignedEngineer) : null;
   const email = customer?.email;
-  let devCode: string | undefined;
-  if (process.env.NODE_ENV !== "production") devCode = code;
   let emailStatus: string = "PENDING";
   if (email) {
     try {
@@ -89,6 +87,5 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     after: { emailStatus, expiresAt } as unknown as Record<string, unknown>,
     metadata: extractRequestMeta(_req) as unknown as Record<string, unknown>,
   }).catch(() => {});
-  // Never log raw OTP in production; devCode only returned in non-production for testing (not logged)
-  return NextResponse.json({ ok: true, expiresAt, emailStatus, ...(devCode ? { devCode } : {}) });
+  return NextResponse.json({ ok: true, expiresAt, emailStatus });
 }

@@ -262,7 +262,7 @@ function formatCell(v: unknown, key: string): string {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Reports" description="10 reports • server-side filters • pagination • Excel/PDF • RBAC reports.view/export • ServiceCall counted once, Visit separate" />
+      <PageHeader title="Reports" description="View and export various reports" />
       <Card><CardContent className="pt-6 space-y-4">
         <div className="flex flex-wrap gap-2">
           <Select value={report} onValueChange={(v) => setReport(v as ReportType)}><SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger><SelectContent>{REPORTS.map((r) => <SelectItem key={r.id} value={r.id}>{r.label}</SelectItem>)}</SelectContent></Select>
@@ -281,7 +281,6 @@ function formatCell(v: unknown, key: string): string {
         <div className="flex gap-2">
           <Button size="sm" onClick={exportExcel}>Export Excel</Button>
           <Button size="sm" variant="outline" onClick={exportPdf}>Export PDF</Button>
-          <span className="text-xs text-muted-foreground self-center">Exports respect current filters + RBAC (5,000 limit)</span>
         </div>
         {loading ? <p className="text-sm text-muted-foreground">Loading...</p> : items.length === 0 ? <EmptyState title="No records" description={`No ${report} records for filters`} /> : (
           <div className="overflow-x-auto">

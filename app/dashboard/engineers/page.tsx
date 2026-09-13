@@ -81,7 +81,7 @@ export default function EngineersPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        <Link href={`/dashboard/engineer/profile`}><Button size="xs" variant="outline">View</Button></Link>
+                        <Link href={`/dashboard/users/${e._id}`}><Button size="xs" variant="outline">View</Button></Link>
                         <Link href={`/dashboard/service-calls?engineer=${e._id}`}><Button size="xs" variant="outline">Calls</Button></Link>
                       </div>
                     </TableCell>
