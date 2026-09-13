@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -8,7 +8,6 @@ export const metadata: Metadata = {
   applicationName: "ESP Soln",
   appleWebApp: { capable: true, statusBarStyle: "default", title: "ESP Soln" },
   formatDetection: { telephone: false },
-  themeColor: "#059669",
   icons: {
     icon: [
       { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
@@ -18,7 +17,7 @@ export const metadata: Metadata = {
   },
 };
 
-export const viewport = {
+export const viewport: Viewport = {
   themeColor: "#059669",
   width: "device-width",
   initialScale: 1,

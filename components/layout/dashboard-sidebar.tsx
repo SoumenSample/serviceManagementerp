@@ -105,6 +105,14 @@ export function DashboardSidebar({ user }: DashboardSidebarProps) {
     }),
   })).filter((g) => g.items.length > 0)
 
+  // Only the longest matching URL should be active.
+  // Fixes: Dashboard ("/dashboard") was matching every "/dashboard/*" route,
+  // and "/dashboard/engineers" was matching "/dashboard/engineers/locations".
+  const allUrls = filteredGroups.flatMap((g) => g.items.map((i) => i.url))
+  const activeUrl = [...allUrls]
+    .sort((a, b) => b.length - a.length)
+    .find((url) => pathname === url || pathname.startsWith(url + "/"))
+
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="h-14 shrink-0 border-b px-2 flex !flex-row items-center !py-0 !gap-2">
@@ -127,7 +135,7 @@ export function DashboardSidebar({ user }: DashboardSidebarProps) {
                 {group.items.map((item) => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
-                      isActive={pathname === item.url || pathname.startsWith(item.url + "/")}
+                      isActive={item.url === activeUrl}
                       tooltip={item.title}
                       render={<Link href={item.url} />}
                     >
