@@ -42,7 +42,23 @@ export function LocationTracker() {
     return null;
   }, []);
 
+  const checkAttendanceActive = useCallback(async (): Promise<boolean> => {
+    try {
+      const res = await fetch("/api/attendance");
+      if (!res.ok) return false;
+      const d = await res.json();
+      return !!d.attendance && d.attendance.status === "ACTIVE";
+    } catch { return false; }
+  }, []);
+
   const ensureShift = useCallback(async () => {
+    // Do not auto-create EngineerShift if Attendance is not ACTIVE (after explicit End Shift)
+    const attendanceActive = await checkAttendanceActive();
+    if (!attendanceActive) {
+      // No active attendance -> treat as ended, don't create shift
+      setStatus("ended");
+      return null;
+    }
     // Try to resume, else start
     let s = await fetchShift();
     if (!s) {
@@ -55,7 +71,7 @@ export function LocationTracker() {
       }
     }
     return s;
-  }, [fetchShift]);
+  }, [fetchShift, checkAttendanceActive]);
 
   const sendLocation = useCallback(async (lat: number, lon: number, acc?: number) => {
     try {
@@ -149,15 +165,30 @@ export function LocationTracker() {
 
   const handleEndShift = async () => {
     if (!confirm("End your shift? Your location tracking will stop.")) return;
-    const res = await fetch("/api/engineer/shift/end", { method: "POST" });
-    if (res.ok) {
+    // End Attendance (which also ends EngineerShift for engineers)
+    const attRes = await fetch("/api/attendance/end", { method: "POST" });
+    // Also ensure EngineerShift ended (idempotent, attendance/end already does it)
+    await fetch("/api/engineer/shift/end", { method: "POST" }).catch(() => {});
+    if (attRes.ok) {
       if (intervalRef.current) clearInterval(intervalRef.current);
       setStatus("ended");
-      const d = await res.json();
-      setShift(d.shift);
+      const d = await attRes.json();
+      // refresh shift state
+      await fetchShift();
     } else {
       alert("Failed to end shift");
     }
+  };
+
+  const handleStartNewShift = async () => {
+    // Create new Attendance first (login-like), then shift
+    try {
+      await fetch("/api/attendance", { method: "POST" }).catch(() => {});
+    } catch {}
+    await ensureShift();
+    capture();
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    intervalRef.current = setInterval(capture, CAPTURE_INTERVAL_MS);
   };
 
   if (status === "permission_denied") {
@@ -177,9 +208,9 @@ export function LocationTracker() {
       <Card className="border-muted">
         <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2">📍 Location Sharing</CardTitle><CardDescription>Shift ended</CardDescription></CardHeader>
         <CardContent className="text-sm">
-          <p className="flex items-center gap-2">⚪ <span>Shift Ended — Location sharing stopped.</span> <Badge variant="outline">ENDED</Badge></p>
+           <p className="flex items-center gap-2">⚪ <span>Shift Ended — Location sharing stopped.</span> <Badge variant="outline">ENDED</Badge></p>
           {lastUpdate && <p className="text-xs text-muted-foreground mt-2">Last updated: {new Date(lastUpdate).toLocaleString()}<br />{address || ""}</p>}
-          <Button size="sm" className="mt-3" onClick={async () => { await ensureShift(); capture(); intervalRef.current = setInterval(capture, CAPTURE_INTERVAL_MS); }}>Start New Shift</Button>
+          <Button size="sm" className="mt-3" onClick={handleStartNewShift}>Start New Shift</Button>
         </CardContent>
       </Card>
     );

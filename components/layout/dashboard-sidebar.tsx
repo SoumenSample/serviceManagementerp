@@ -87,6 +87,7 @@ const navConfig: { label: string; items: { title: string; url: string; icon: typ
   {
     label: "System",
     items: [
+      { title: "Attendance", url: "/dashboard/attendance", icon: History },
       { title: "Users & Roles", url: "/dashboard/users", icon: Users, perm: "users.view" },
       { title: "Settings", url: "/dashboard/settings", icon: Settings },
       // AUDIT FEATURE TEMPORARILY HIDDEN — not deleted, just commented/hidden per request

@@ -46,6 +46,59 @@ export async function POST(req: Request) {
     }
 
     const token = await signJWT({ sub: String(user._id), email: user.email, role: user.role as never, name: user.name });
+    // Attendance: daily workday - one record per user per calendar day (IST)
+    try {
+      const { Attendance } = await import("@/models/Attendance");
+      const { genAttendanceId } = await import("@/lib/id-generators");
+      const { getISTDateString } = await import("@/lib/attendance-helpers");
+      const now = new Date();
+      const attendanceDate = getISTDateString(now);
+
+      let att = await Attendance.findOne({ user: user._id, attendanceDate });
+      if (!att) {
+        // Try to create today's attendance; handle race duplicate
+        try {
+          const attendanceId = await genAttendanceId();
+          att = await Attendance.create({
+            attendanceId,
+            user: user._id,
+            role: user.role,
+            attendanceDate,
+            startedAt: now,
+            status: "ACTIVE",
+            lastActivityAt: now,
+            sessions: [{ loginAt: now }],
+          });
+        } catch (createErr: unknown) {
+          const msg = createErr instanceof Error ? createErr.message : String(createErr);
+          if (msg.includes("duplicate") || msg.includes("E11000")) {
+            att = await Attendance.findOne({ user: user._id, attendanceDate });
+          } else throw createErr;
+        }
+      }
+      if (att) {
+        // Check if last session is still open -> don't create duplicate session on repeated login
+        const lastSession = att.sessions && att.sessions.length > 0 ? att.sessions[att.sessions.length - 1] : null;
+        const hasOpen = lastSession && !lastSession.logoutAt;
+        if (!hasOpen) {
+          att.sessions.push({ loginAt: now } as never);
+          att.status = "ACTIVE";
+          att.endedAt = undefined;
+          att.lastActivityAt = now;
+          await att.save();
+        } else {
+          // Already has open session, just ensure ACTIVE and update activity
+          if (att.status !== "ACTIVE") {
+            att.status = "ACTIVE";
+            att.endedAt = undefined;
+          }
+          att.lastActivityAt = now;
+          await att.save();
+        }
+      }
+    } catch (e) {
+      console.error("[Attendance] login create failed", e);
+    }
     createAuditLog({
       actorId: String(user._id),
       actorEmail: user.email,

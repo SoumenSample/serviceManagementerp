@@ -30,7 +30,7 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6 max-w-2xl">
-      <PageHeader title="System Settings" description="Company information used in notification templates. Secrets remain in .env." />
+      <PageHeader title="System Settings" description="Configure your system settings" />
       <Card>
         <CardHeader><CardTitle>Company Information</CardTitle><CardDescription>Used in Email templates as OM EPC SOLUTION footer. Non-secret only.</CardDescription></CardHeader>
         <CardContent className="space-y-4">

@@ -64,6 +64,7 @@ export const PERMISSIONS = [
   "amc.edit",
   "amc.delete",
   "audit.view",
+  "attendance.view",
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -81,6 +82,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "users.manage",
     "amc.view","amc.create","amc.edit","amc.delete",
     "audit.view",
+    "attendance.view",
   ],
   coordinator: [
     "site.view","site.create","site.edit",
@@ -91,6 +93,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "expense.view","expense.create","expense.approve","expense.reject","expense.cancel",
     "reports.view",
     "amc.view","amc.create","amc.edit",
+    "attendance.view",
   ],
   engineer: [
     "site.view",
@@ -110,6 +113,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "expense.view","expense.create","expense.approve","expense.reject","expense.cancel","finance.view","invoice.view","invoice.create","payment.view","payment.create",
     "reports.view","reports.export",
     "amc.view",
+    "attendance.view",
   ],
 };
 

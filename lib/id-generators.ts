@@ -83,3 +83,9 @@ export async function genShiftId(): Promise<string> {
   const n = await nextSequence(key);
   return `SHIFT-${year}-${String(n).padStart(6, "0")}`;
 }
+export async function genAttendanceId(): Promise<string> {
+  const year = new Date().getFullYear();
+  const key = `attendanceId-${year}`;
+  const n = await nextSequence(key);
+  return `ATT-${year}-${String(n).padStart(6, "0")}`;
+}

@@ -8,6 +8,7 @@ import { NotificationBell } from "@/components/notifications/notification-bell";
 import { GlobalSearch } from "@/components/search/global-search";
 import { GlobalEngineerTracker } from "@/components/engineer/global-tracker";
 import { WelcomeModal } from "@/components/layout/welcome-modal";
+import { AttendanceHeader } from "@/components/attendance/attendance-header";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
@@ -33,8 +34,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <SidebarTrigger />
           <Separator orientation="vertical" className="h-6" />
           <div className="flex flex-1 items-center justify-between gap-4">
-            <p className="hidden md:block text-sm text-muted-foreground">UPS/Inverter AMC & Repair Service Tracking</p>
+            <p className="hidden lg:block text-sm text-muted-foreground">UPS/Inverter AMC & Repair Service Tracking</p>
             <div className="flex items-center gap-2 flex-1 justify-end">
+              <AttendanceHeader />
               <GlobalSearch />
               <NotificationBell />
             </div>

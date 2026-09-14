@@ -10,7 +10,21 @@ export function GlobalEngineerTracker({ role }: { role: string }) {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const watchIdRef = useRef<number | null>(null);
 
+  const checkAttendanceActive = useCallback(async (): Promise<boolean> => {
+    try {
+      const res = await fetch("/api/attendance");
+      if (!res.ok) return false;
+      const d = await res.json();
+      return !!d.attendance && d.attendance.status === "ACTIVE";
+    } catch {
+      return false;
+    }
+  }, []);
+
   const ensureShift = useCallback(async () => {
+    // DO NOT auto-create EngineerShift if Attendance is not ACTIVE (after explicit End Shift)
+    const attendanceActive = await checkAttendanceActive();
+    if (!attendanceActive) return null;
     const res = await fetch("/api/engineer/shift");
     if (res.ok) {
       const d = await res.json();
@@ -22,7 +36,7 @@ export function GlobalEngineerTracker({ role }: { role: string }) {
       return d.shift;
     }
     return null;
-  }, []);
+  }, [checkAttendanceActive]);
 
   const checkRefreshRequest = useCallback(async () => {
     try {
@@ -51,6 +65,9 @@ export function GlobalEngineerTracker({ role }: { role: string }) {
 
   const startTracking = useCallback(async () => {
     if (role !== "engineer") return;
+    // Attendance must be ACTIVE - prevents auto-restart after End Shift
+    const attendanceActive = await checkAttendanceActive();
+    if (!attendanceActive) return;
     const shift = await ensureShift();
     if (!shift || shift.status !== "ACTIVE") return;
     if (!navigator.geolocation) return;
@@ -91,12 +108,20 @@ export function GlobalEngineerTracker({ role }: { role: string }) {
     };
     document.addEventListener("visibilitychange", onVisible);
     (globalThis as unknown as { __locVisibleHandler?: () => void }).__locVisibleHandler = onVisible;
-  }, [role, ensureShift, sendLocation]);
+  }, [role, ensureShift, sendLocation, checkAttendanceActive]);
 
   useEffect(() => {
     if (role !== "engineer") return;
     startTracking();
+    const handleAttendanceEnded = () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      const rp = (intervalRef as unknown as { refreshPoll?: NodeJS.Timeout }).refreshPoll;
+      if (rp) clearInterval(rp);
+      if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
+    };
+    window.addEventListener("attendance-ended", handleAttendanceEnded);
     return () => {
+      window.removeEventListener("attendance-ended", handleAttendanceEnded);
       if (intervalRef.current) clearInterval(intervalRef.current);
       const rp = (intervalRef as unknown as { refreshPoll?: NodeJS.Timeout }).refreshPoll;
       if (rp) clearInterval(rp);

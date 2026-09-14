@@ -30,5 +30,11 @@ export async function connectDB(): Promise<typeof mongoose> {
     });
   }
   cached.conn = await cached.promise;
+  // Ensure critical unique indexes exist (especially Attendance daily uniqueness)
+  // Mongoose autoIndex is disabled in production, so we explicitly init.
+  try {
+    const { Attendance } = await import("@/models/Attendance");
+    await (Attendance as unknown as { init: () => Promise<void> }).init().catch(() => {});
+  } catch {}
   return cached.conn;
 }
