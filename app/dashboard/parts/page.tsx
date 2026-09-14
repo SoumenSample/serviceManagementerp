@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useAppAlert } from "@/components/common/alert-provider";
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/empty-state";
 import { Card, CardContent } from "@/components/ui/card";
@@ -17,6 +18,7 @@ import { partSchema } from "@/lib/validators";
 type Part = { _id: string; partId: string; partNumber: string; name: string; brand?: string; category?: string; minimumStockLevel: number; active: boolean; available: number; inventory?: { _id: string; quantityOnHand: number; quantityReserved: number } };
 
 export default function PartsPage() {
+  const { showAlert, showConfirm } = useAppAlert();
   const [items, setItems] = useState<Part[]>([]);
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
@@ -40,7 +42,7 @@ export default function PartsPage() {
   function onEdit(p: Part) { setEditing(p); form.reset({ partNumber: p.partNumber, name: p.name, description: (p as never as { description?: string }).description || "", category: p.category || "", brand: p.brand || "", minimumStockLevel: p.minimumStockLevel, active: p.active }); setOpen(true); }
 
   async function onStockAdjust() {
-    if (!stockPart || !stockQty || Number(stockQty) <= 0) return alert("Enter valid quantity");
+    if (!stockPart || !stockQty || Number(stockQty) <= 0) { await showAlert("Enter valid quantity", "Error"); return; }
     // Need inventory _id — fetch from inventory API if not present
     let invId = stockPart.inventory?._id;
     if (!invId) {
@@ -51,9 +53,9 @@ export default function PartsPage() {
         invId = found?._id;
       }
     }
-    if (!invId) return alert("Inventory record not found");
+    if (!invId) { await showAlert("Inventory record not found", "Error"); return; }
     const res = await fetch(`/api/inventory/${invId}/adjust`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: stockType, quantity: Number(stockQty) }) });
-    if (res.ok) { setStockOpen(false); setStockQty(""); load(); } else alert("Failed: " + JSON.stringify(await res.json()));
+    if (res.ok) { setStockOpen(false); setStockQty(""); load(); } else await showAlert("Failed: " + JSON.stringify(await res.json()), "Error");
   }
 
   async function onSubmit(values: unknown) {
@@ -62,12 +64,12 @@ export default function PartsPage() {
     const method = editing ? "PUT" : "POST";
     const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(values) });
     setLoading(false);
-    if (res.ok) { setOpen(false); load(); } else alert("Failed: " + JSON.stringify(await res.json()));
+    if (res.ok) { setOpen(false); load(); } else await showAlert("Failed: " + JSON.stringify(await res.json()), "Error");
   }
   async function onDelete(id: string) {
-    if (!confirm("Permanently delete this spare part? Inventory will be removed. This cannot be undone.")) return;
+    if (!(await showConfirm("Permanently delete this spare part? Inventory will be removed. This cannot be undone.", { title: "Confirm Delete" }))) return;
     const res = await fetch(`/api/parts/${id}`, { method: "DELETE" });
-    if (res.ok) load(); else alert("Delete failed: " + JSON.stringify(await res.json()));
+    if (res.ok) load(); else await showAlert("Delete failed: " + JSON.stringify(await res.json()), "Error");
   }
 
   return (

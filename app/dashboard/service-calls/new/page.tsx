@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useAppAlert } from "@/components/common/alert-provider";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +16,7 @@ import Link from "next/link";
 
 function NewServiceCallPageInner() {
   const router = useRouter();
+  const { showAlert } = useAppAlert();
   const searchParams = useSearchParams();
   const equipmentId = searchParams.get("equipmentId");
   const [customers, setCustomers] = useState<{ _id: string; companyName: string }[]>([]);
@@ -143,7 +145,7 @@ function NewServiceCallPageInner() {
     if (res.ok) {
       const doc = await res.json();
       router.push(`/dashboard/service-calls/${doc._id}`);
-    } else alert("Failed: " + JSON.stringify(await res.json()));
+    } else await showAlert("Failed: " + JSON.stringify(await res.json()), "Error");
   }
 
   return (

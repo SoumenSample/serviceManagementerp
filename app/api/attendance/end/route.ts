@@ -18,19 +18,24 @@ export async function POST() {
     return NextResponse.json({ attendance: null, message: "No attendance for today" });
   }
 
-  // Close current open session if any
+  // Close current open session if any - atomic
   if (attendance.sessions && attendance.sessions.length > 0) {
     const lastIdx = attendance.sessions.length - 1;
-    const last = attendance.sessions[lastIdx] as unknown as { logoutAt?: Date };
+    const last = attendance.sessions[lastIdx] as unknown as { logoutAt?: Date | null };
     if (!last.logoutAt) {
-      (attendance.sessions[lastIdx] as unknown as { logoutAt?: Date }).logoutAt = now;
-      attendance.markModified("sessions");
+      await Attendance.updateOne(
+        { _id: attendance._id },
+        { $set: { [`sessions.${lastIdx}.logoutAt`]: now, status: "ENDED", endedAt: now, lastActivityAt: now } }
+      );
+      attendance = (await Attendance.findOne({ _id: attendance._id }))!;
+    } else {
+      await Attendance.updateOne({ _id: attendance._id }, { $set: { status: "ENDED", endedAt: now, lastActivityAt: now } });
+      attendance = (await Attendance.findOne({ _id: attendance._id }))!;
     }
+  } else {
+    await Attendance.updateOne({ _id: attendance._id }, { $set: { status: "ENDED", endedAt: now, lastActivityAt: now } });
+    attendance = (await Attendance.findOne({ _id: attendance._id }))!;
   }
-  attendance.status = "ENDED";
-  attendance.endedAt = now;
-  attendance.lastActivityAt = now;
-  await attendance.save();
 
   // For engineer, also end EngineerShift and stop GPS
   if (auth.role === "engineer") {

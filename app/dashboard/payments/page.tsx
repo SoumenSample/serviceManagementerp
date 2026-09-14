@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
+import { useAppAlert } from "@/components/common/alert-provider";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -36,6 +37,7 @@ type InvOption = { _id: string; invoiceId: string; customer: { companyName: stri
 const canCreateByRole = (role: string) => ["super_admin", "manager", "accounts"].includes(role);
 
 export default function PaymentsPage() {
+  const { showAlert } = useAppAlert();
   const [items, setItems] = useState<PaymentItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -386,7 +388,7 @@ export default function PaymentsPage() {
               onSubmit={form.handleSubmit(async (v: unknown) => {
                 const vals = v as { invoice: string; amount: number; paymentDate?: string; paymentMethod: string; referenceNumber?: string; remarks?: string };
                 if (selectedInvoice && Number(vals.amount) > outstandingForSelected) {
-                  alert(`Amount exceeds outstanding ${inr(outstandingForSelected)}`);
+                  await showAlert(`Amount exceeds outstanding ${inr(outstandingForSelected)}`, "Error");
                   return;
                 }
                 setSubmitting(true);
@@ -406,7 +408,7 @@ export default function PaymentsPage() {
                   });
                 } else {
                   const err = await res.json().catch(() => ({ error: "Failed" }));
-                  alert("Failed: " + (err.error || JSON.stringify(err)));
+                  await showAlert("Failed: " + (err.error || JSON.stringify(err)), "Error");
                 }
               })}
               className="space-y-4"

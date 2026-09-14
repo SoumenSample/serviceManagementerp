@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useAppAlert } from "@/components/common/alert-provider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +19,7 @@ export default function AmcEditPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
   const router = useRouter();
+  const { showAlert } = useAppAlert();
   const [loading, setLoading] = useState(false);
   const [engineers, setEngineers] = useState<{ _id: string; name: string }[]>([]);
 
@@ -58,7 +60,7 @@ export default function AmcEditPage() {
     const res = await fetch(`/api/amc/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values) });
     setLoading(false);
     if (res.ok) router.push(`/dashboard/amc/${id}`);
-    else alert("Failed: " + JSON.stringify(await res.json()));
+    else await showAlert("Failed: " + JSON.stringify(await res.json()), "Error");
   }
 
   return (

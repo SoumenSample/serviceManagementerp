@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useAppAlert } from "@/components/common/alert-provider";
 
 type Attendance = {
   _id: string;
@@ -12,6 +13,7 @@ type Attendance = {
 };
 
 export function AttendanceHeader() {
+  const { showAlert, showConfirm } = useAppAlert();
   const [attendance, setAttendance] = useState<Attendance | null>(null);
   const [latest, setLatest] = useState<Attendance | null>(null);
   const [loading, setLoading] = useState(true);
@@ -42,7 +44,7 @@ export function AttendanceHeader() {
   }, [fetchAttendance]);
 
   const handleEndShift = async () => {
-    if (!confirm("End your shift? This will mark your attendance as ended. For engineers, GPS tracking will also stop.")) return;
+    if (!(await showConfirm("End your shift? This will mark your attendance as ended. For engineers, GPS tracking will also stop.", { title: "Confirm End Shift" }))) return;
     const res = await fetch("/api/attendance/end", { method: "POST" });
     if (res.ok) {
       const d = await res.json();
@@ -59,7 +61,7 @@ export function AttendanceHeader() {
       fetchAttendance();
     } else {
       const j = await res.json().catch(() => ({}));
-      alert(j.error || "Failed to end shift");
+      await showAlert(j.error || "Failed to end shift", "Error");
     }
   };
 

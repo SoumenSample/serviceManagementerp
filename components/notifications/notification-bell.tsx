@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
+import { useAppAlert } from "@/components/common/alert-provider";
 
 type Notif = { _id: string; title: string; message: string; isRead: boolean; createdAt: string; relatedModule?: string; relatedRecordId?: string; serviceCall?: string };
 
 export function NotificationBell() {
+  const { showConfirm } = useAppAlert();
   const [count, setCount] = useState(0);
   const [items, setItems] = useState<Notif[]>([]);
   const [open, setOpen] = useState(false);
@@ -45,7 +47,7 @@ export function NotificationBell() {
   }
   async function permanentDelete(e: React.MouseEvent, id: string) {
     e.stopPropagation();
-    if (!confirm("Permanently delete this notification? This cannot be undone.")) return;
+    if (!(await showConfirm("Permanently delete this notification? This cannot be undone.", { title: "Confirm Delete" }))) return;
     await fetch(`/api/notifications/${id}?permanent=true`, { method: "DELETE" });
     setItems((prev) => prev.filter((n) => n._id !== id));
   }
@@ -55,7 +57,7 @@ export function NotificationBell() {
     setItems((prev) => prev.filter((n) => n._id !== id));
   }
   async function deleteAll() {
-    if (!confirm(tab === "trash" ? "Permanently delete all trashed notifications?" : "Move all notifications to trash?")) return;
+    if (!(await showConfirm(tab === "trash" ? "Permanently delete all trashed notifications?" : "Move all notifications to trash?", { title: "Confirm Delete" }))) return;
     if (tab === "trash") await fetch("/api/notifications?permanent=true&deletedOnly=true", { method: "DELETE" });
     else await fetch("/api/notifications", { method: "DELETE" });
     load();

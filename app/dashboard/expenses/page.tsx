@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useAppAlert } from "@/components/common/alert-provider";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +19,7 @@ import { serviceExpenseSchema } from "@/lib/validators";
 type Exp = { _id: string; expenseId: string; serviceCall: { callId: string }; serviceVisit?: { visitId: string }; category: string; amount: number; status: string; expenseDate: string; submittedBy: { _id?: string; name: string }; incurredBy: { name: string }; costSource: string; remarks?: string };
 
 export default function ExpensesPage() {
+  const { showAlert, showConfirm } = useAppAlert();
   const [items, setItems] = useState<Exp[]>([]);
   const [serviceCalls, setServiceCalls] = useState<{ _id: string; callId: string }[]>([]);
   const [serviceVisits, setServiceVisits] = useState<{ _id: string; visitId: string }[]>([]);
@@ -45,18 +47,18 @@ export default function ExpensesPage() {
 
   async function handleApprove(id: string) {
     const res = await fetch(`/api/service-expenses/${id}/status`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "APPROVED" }) });
-    if (res.ok) load(); else alert("Approve failed: " + JSON.stringify(await res.json()));
+    if (res.ok) load(); else await showAlert("Approve failed: " + JSON.stringify(await res.json()), "Error");
   }
   async function handleReject() {
     if (!rejectTarget) return;
-    if (!rejectRemarks.trim()) return alert("Rejection remarks required");
+    if (!rejectRemarks.trim()) { await showAlert("Rejection remarks required", "Error"); return; }
     const res = await fetch(`/api/service-expenses/${rejectTarget._id}/status`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "REJECTED", remarks: rejectRemarks.trim() }) });
-    if (res.ok) { setRejectOpen(false); setRejectRemarks(""); setRejectTarget(null); load(); } else alert("Reject failed: " + JSON.stringify(await res.json()));
+    if (res.ok) { setRejectOpen(false); setRejectRemarks(""); setRejectTarget(null); load(); } else await showAlert("Reject failed: " + JSON.stringify(await res.json()), "Error");
   }
   async function handleResubmit(id: string) {
-    if (!confirm("Re-apply this rejected expense? It will be resubmitted for approval.")) return;
+    if (!(await showConfirm("Re-apply this rejected expense? It will be resubmitted for approval.", { title: "Confirm Re-apply" }))) return;
     const res = await fetch(`/api/service-expenses/${id}/status`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "SUBMITTED" }) });
-    if (res.ok) load(); else alert("Resubmit failed: " + JSON.stringify(await res.json()));
+    if (res.ok) load(); else await showAlert("Resubmit failed: " + JSON.stringify(await res.json()), "Error");
   }
   const selectedCall = form.watch("serviceCall");
   useEffect(() => {
@@ -95,7 +97,7 @@ export default function ExpensesPage() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(async (v: unknown) => {
               setLoading(true); const res = await fetch("/api/service-expenses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(v) }); setLoading(false);
-              if (res.ok) { setOpen(false); load(); } else alert("Failed: " + JSON.stringify(await res.json()));
+              if (res.ok) { setOpen(false); load(); } else await showAlert("Failed: " + JSON.stringify(await res.json()), "Error");
             })} className="space-y-3">
               <FormField control={form.control} name="serviceCall" render={({ field }) => (<FormItem><FormLabel>Service Call *</FormLabel><Select value={field.value ?? ""} onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger></FormControl><SelectContent>{serviceCalls.map((c) => <SelectItem key={c._id} value={c._id}>{c.callId}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
               <FormField control={form.control} name="serviceVisit" render={({ field }) => (<FormItem><FormLabel>Service Visit (first-class)</FormLabel><Select value={field.value || "none"} onValueChange={(v) => field.onChange(v === "none" ? "" : v)}><FormControl><SelectTrigger><SelectValue placeholder="Select visit" /></SelectTrigger></FormControl><SelectContent><SelectItem value="none">None (legacy)</SelectItem>{serviceVisits.map((v) => <SelectItem key={v._id} value={v._id}>{v.visitId}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />

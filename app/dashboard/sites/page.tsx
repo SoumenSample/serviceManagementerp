@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { PageHeader } from "@/components/common/page-header";
+import { useAppAlert } from "@/components/common/alert-provider";
 import { EmptyState } from "@/components/common/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,7 @@ type Site = { _id: string; siteId: string; siteName: string; city?: string; stat
 type Customer = { _id: string; companyName: string };
 
 export default function SitesPage() {
+  const { showAlert, showConfirm } = useAppAlert();
   const [items, setItems] = useState<Site[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [engineers, setEngineers] = useState<{ _id: string; name: string }[]>([]);
@@ -64,9 +66,9 @@ export default function SitesPage() {
     const method = editing ? "PUT" : "POST";
     const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(values) });
     setLoading(false);
-    if (res.ok) { setOpen(false); load(); } else alert("Failed: " + JSON.stringify(await res.json()));
+    if (res.ok) { setOpen(false); load(); } else await showAlert("Failed: " + JSON.stringify(await res.json()), "Error");
   }
-  async function onDelete(id: string) { if (!confirm("Delete site?")) return; await fetch(`/api/sites/${id}`, { method: "DELETE" }); load(); }
+  async function onDelete(id: string) { if (!(await showConfirm("Delete site?", { title: "Confirm Delete" }))) return; await fetch(`/api/sites/${id}`, { method: "DELETE" }); load(); }
 
   return (
     <div className="space-y-6">

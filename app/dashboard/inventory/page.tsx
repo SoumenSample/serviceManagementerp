@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAppAlert } from "@/components/common/alert-provider";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ import { EmptyState } from "@/components/common/empty-state";
 type Inv = { _id: string; part: { partNumber: string; name: string; minimumStockLevel: number }; location: string; quantityOnHand: number; quantityReserved: number; quantityAvailable: number };
 
 export default function InventoryPage() {
+  const { showAlert } = useAppAlert();
   const [items, setItems] = useState<Inv[]>([]);
   const [low, setLow] = useState(false);
   const [adjustOpen, setAdjustOpen] = useState(false);
@@ -53,7 +55,7 @@ export default function InventoryPage() {
           <DialogFooter><Button variant="outline" onClick={() => setAdjustOpen(false)}>Cancel</Button><Button onClick={async () => {
             if (!selected || !qty) return;
             const res = await fetch(`/api/inventory/${selected._id}/adjust`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type, quantity: Number(qty) }) });
-            if (res.ok) { setAdjustOpen(false); setQty(""); load(); } else alert("Failed: " + JSON.stringify(await res.json()));
+            if (res.ok) { setAdjustOpen(false); setQty(""); load(); } else await showAlert("Failed: " + JSON.stringify(await res.json()), "Error");
           }}>Submit</Button></DialogFooter>
         </DialogContent>
       </Dialog>

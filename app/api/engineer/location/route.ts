@@ -55,6 +55,22 @@ export async function POST(req: Request) {
   shift.lastAddress = geo?.address || `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
   await shift.save();
 
+  // Prune to keep only last 10 locations per engineer (save space)
+  // Keep 10 most recent, delete older
+  try {
+    const recent = await EngineerLocation.find({ engineer: auth.sub })
+      .sort({ capturedAt: -1 })
+      .limit(10)
+      .select("_id")
+      .lean();
+    if (recent.length === 10) {
+      const keepIds = recent.map((r) => r._id);
+      await EngineerLocation.deleteMany({ engineer: auth.sub, _id: { $nin: keepIds } });
+    }
+  } catch {
+    // pruning failure should not block response
+  }
+
   return NextResponse.json({ location: loc, shift }, { status: 201 });
 }
 

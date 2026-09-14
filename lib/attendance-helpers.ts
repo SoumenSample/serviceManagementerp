@@ -42,6 +42,11 @@ export function formatDurationMs(ms: number): string {
 
 export function hasOpenSession(sessions: AttendanceSession[] | undefined): boolean {
   if (!sessions || sessions.length === 0) return false;
-  const last = sessions[sessions.length - 1];
+  const last = sessions[sessions.length - 1] as unknown as { logoutAt?: Date | null };
   return !last.logoutAt;
+}
+
+export function normalizeAttendanceStatus(att: { sessions?: AttendanceSession[]; status?: string; endedAt?: Date | null }): { hasOpen: boolean } {
+  const hasOpen = hasOpenSession(att.sessions);
+  return { hasOpen };
 }

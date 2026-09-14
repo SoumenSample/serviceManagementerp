@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useAppAlert } from "@/components/common/alert-provider";
 import { PageHeader } from "@/components/common/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import Link from "next/link";
 
 export default function AmcNewPage() {
   const router = useRouter();
+  const { showAlert } = useAppAlert();
   const [customers, setCustomers] = useState<{ _id: string; companyName: string }[]>([]);
   const [sites, setSites] = useState<{ _id: string; siteName: string; customer: string }[]>([]);
   const [equipment, setEquipment] = useState<{ _id: string; equipmentId: string; site: string }[]>([]);
@@ -92,7 +94,7 @@ export default function AmcNewPage() {
       router.push(`/dashboard/amc/${doc._id}`);
     } else {
       const err = await res.json();
-      alert("Failed: " + JSON.stringify(err));
+      await showAlert("Failed: " + JSON.stringify(err), "Error");
     }
   }
 

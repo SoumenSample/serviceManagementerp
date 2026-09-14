@@ -78,22 +78,30 @@ export async function POST(req: Request) {
       }
       if (att) {
         // Check if last session is still open -> don't create duplicate session on repeated login
-        const lastSession = att.sessions && att.sessions.length > 0 ? att.sessions[att.sessions.length - 1] : null;
-        const hasOpen = lastSession && !lastSession.logoutAt;
+        const lastSession = att.sessions && att.sessions.length > 0 ? att.sessions[att.sessions.length - 1] as unknown as { logoutAt?: Date | null } : null;
+        const hasOpen = !!(lastSession && !lastSession.logoutAt);
         if (!hasOpen) {
-          att.sessions.push({ loginAt: now } as never);
-          att.status = "ACTIVE";
-          att.endedAt = undefined;
-          att.lastActivityAt = now;
-          await att.save();
+          // Atomic push new session and set ACTIVE
+          await Attendance.updateOne(
+            { _id: att._id },
+            {
+              $push: { sessions: { loginAt: now } },
+              $set: { status: "ACTIVE", lastActivityAt: now },
+              $unset: { endedAt: "" },
+            }
+          );
+          att = await Attendance.findOne({ _id: att._id });
+          console.log(`[Attendance] login new session user=${user._id} date=${attendanceDate} id=${att?.attendanceId} sessions=${att?.sessions.length}`);
         } else {
           // Already has open session, just ensure ACTIVE and update activity
+          const update: Record<string, unknown> = { lastActivityAt: now };
           if (att.status !== "ACTIVE") {
-            att.status = "ACTIVE";
-            att.endedAt = undefined;
+            (update as Record<string, string>).status = "ACTIVE";
           }
-          att.lastActivityAt = now;
-          await att.save();
+          // Always unset endedAt if hasOpen
+          await Attendance.updateOne({ _id: att._id }, { $set: update, $unset: { endedAt: "" } });
+          att = await Attendance.findOne({ _id: att._id });
+          console.log(`[Attendance] login reuse open session user=${user._id} date=${attendanceDate} id=${att?.attendanceId} status=${att?.status}`);
         }
       }
     } catch (e) {

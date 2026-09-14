@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAppAlert } from "@/components/common/alert-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -21,6 +22,7 @@ type Call = {
 };
 
 export default function ServiceCallsPage() {
+  const { showAlert, showConfirm } = useAppAlert();
   const [items, setItems] = useState<Call[]>([]);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("all");
@@ -59,12 +61,12 @@ export default function ServiceCallsPage() {
   async function handleEditSave() {
     if (!editItem) return;
     const res = await fetch(`/api/service-calls/${editItem._id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ priority: editPriority, problemDescription: editProblem, targetVisitDate: editTargetVisit || undefined, targetResolutionDate: editTargetResolution || undefined }) });
-    if (res.ok) { setEditOpen(false); load(); } else alert("Edit failed: " + JSON.stringify(await res.json()));
+    if (res.ok) { setEditOpen(false); load(); } else await showAlert("Edit failed: " + JSON.stringify(await res.json()), "Error");
   }
   async function handleDelete(id: string) {
-    if (!confirm("Permanently delete this service call? This cannot be undone.")) return;
+    if (!(await showConfirm("Permanently delete this service call? This cannot be undone.", { title: "Confirm Delete" }))) return;
     const res = await fetch(`/api/service-calls/${id}`, { method: "DELETE" });
-    if (res.ok) load(); else alert("Delete failed: " + JSON.stringify(await res.json()));
+    if (res.ok) load(); else await showAlert("Delete failed: " + JSON.stringify(await res.json()), "Error");
   }
 
   return (

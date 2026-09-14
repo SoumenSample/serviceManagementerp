@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useAppAlert } from "@/components/common/alert-provider";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,7 @@ type Eq = {
 export default function EquipmentDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const { showAlert } = useAppAlert();
   const id = params.id;
   const [eq, setEq] = useState<Eq | null>(null);
   const [movements, setMovements] = useState<{ _id: string; fromSite?: { siteName: string }; toSite: { siteName: string }; date: string; reason?: string; remarks?: string }[]>([]);
@@ -225,13 +227,13 @@ export default function EquipmentDetailPage() {
             <Button variant="outline" onClick={() => setTransferOpen(false)}>Cancel</Button>
             <Button
               onClick={async () => {
-                if (!transferSite) return alert("Select site");
+                if (!transferSite) { await showAlert("Select site", "Error"); return; }
                 const res = await fetch(`/api/equipment/${id}`, {
                   method: "PUT",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ site: transferSite, reason: transferReason, remarks: transferRemarks }),
                 });
-                if (res.ok) { setTransferOpen(false); router.refresh(); window.location.reload(); } else alert("Transfer failed: " + JSON.stringify(await res.json()));
+                if (res.ok) { setTransferOpen(false); router.refresh(); window.location.reload(); } else await showAlert("Transfer failed: " + JSON.stringify(await res.json()), "Error");
               }}
             >
               Transfer

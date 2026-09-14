@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAppAlert } from "@/components/common/alert-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +24,7 @@ function canEditUserClient(editorRole: string, targetRole: string, editorId: str
 export default function UserDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
+  const { showAlert } = useAppAlert();
   const [user, setUser] = useState<UserDetail | null>(null);
   const [stats, setStats] = useState<{ assigned: number; open: number; completed: number } | null>(null);
   const [role, setRole] = useState("");
@@ -101,7 +103,7 @@ export default function UserDetailPage() {
                 setSaving(true);
                 const res = await fetch(`/api/users/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: editForm.name, email: editForm.email, mobile: editForm.mobile, employeeId: editForm.employeeId, designation: editForm.designation }) });
                 setSaving(false);
-                if (res.ok) { alert("Profile updated"); setEditMode(false); load(); } else alert("Failed: " + JSON.stringify(await res.json()));
+                if (res.ok) { await showAlert("Profile updated", "Notice"); setEditMode(false); load(); } else await showAlert("Failed: " + JSON.stringify(await res.json()), "Error");
               }}>{saving ? "Saving..." : "Save"}</Button>
             </div>
           </div>
@@ -122,7 +124,7 @@ export default function UserDetailPage() {
         <Select value={role} onValueChange={(v) => setRole(v as string)} disabled={!canEdit}><SelectTrigger className="flex-1"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="super_admin">super_admin</SelectItem><SelectItem value="manager">manager</SelectItem><SelectItem value="coordinator">coordinator</SelectItem><SelectItem value="engineer">engineer</SelectItem><SelectItem value="accounts">accounts</SelectItem></SelectContent></Select>
         <Button size="sm" disabled={!canEdit} onClick={async () => {
           const res = await fetch(`/api/users/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ role }) });
-          if (res.ok) { alert("Role updated"); load(); } else alert("Failed: " + JSON.stringify(await res.json()));
+          if (res.ok) { await showAlert("Role updated", "Notice"); load(); } else await showAlert("Failed: " + JSON.stringify(await res.json()), "Error");
         }}>Update</Button>
         </div>
       </CardContent></Card>
@@ -134,7 +136,7 @@ export default function UserDetailPage() {
         <Button size="sm" disabled={!canEdit} onClick={async () => {
           if (!newPass) return;
           const res = await fetch(`/api/users/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ newPassword: newPass, confirmPassword: newPass }) });
-          if (res.ok) { alert("Password reset"); setNewPass(""); } else alert("Failed: " + JSON.stringify(await res.json()));
+          if (res.ok) { await showAlert("Password reset", "Notice"); setNewPass(""); } else await showAlert("Failed: " + JSON.stringify(await res.json()), "Error");
         }}>Reset</Button>
         </div>
       </CardContent></Card>

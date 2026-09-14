@@ -32,15 +32,15 @@ export async function POST() {
 
   let att = await Attendance.findOne({ user: auth.sub, attendanceDate });
   if (att) {
-    const last = att.sessions && att.sessions.length > 0 ? att.sessions[att.sessions.length - 1] as unknown as { logoutAt?: Date } : null;
-    const hasOpen = last && !last.logoutAt;
+    const last = att.sessions && att.sessions.length > 0 ? att.sessions[att.sessions.length - 1] as unknown as { logoutAt?: Date | null } : null;
+    const hasOpen = !!(last && !last.logoutAt);
     if (hasOpen) return NextResponse.json({ attendance: att, resumed: true });
-    // reopen today's record with new session
-    att.sessions.push({ loginAt: now } as never);
-    att.status = "ACTIVE";
-    att.endedAt = undefined;
-    att.lastActivityAt = now;
-    await att.save();
+    // reopen today's record with new session - atomic
+    await Attendance.updateOne(
+      { _id: att._id },
+      { $push: { sessions: { loginAt: now } }, $set: { status: "ACTIVE", lastActivityAt: now }, $unset: { endedAt: "" } }
+    );
+    att = await Attendance.findOne({ user: auth.sub, attendanceDate });
     return NextResponse.json({ attendance: att, resumed: false });
   }
 
@@ -63,13 +63,13 @@ export async function POST() {
     if (msg.includes("duplicate") || msg.includes("E11000")) {
       att = await Attendance.findOne({ user: auth.sub, attendanceDate });
       if (att) {
-        const last = att.sessions && att.sessions.length > 0 ? att.sessions[att.sessions.length - 1] as unknown as { logoutAt?: Date } : null;
+        const last = att.sessions && att.sessions.length > 0 ? att.sessions[att.sessions.length - 1] as unknown as { logoutAt?: Date | null } : null;
         if (last && !last.logoutAt) return NextResponse.json({ attendance: att, resumed: true });
-        att.sessions.push({ loginAt: now } as never);
-        att.status = "ACTIVE";
-        att.endedAt = undefined;
-        att.lastActivityAt = now;
-        await att.save();
+        await Attendance.updateOne(
+          { _id: att._id },
+          { $push: { sessions: { loginAt: now } }, $set: { status: "ACTIVE", lastActivityAt: now }, $unset: { endedAt: "" } }
+        );
+        att = await Attendance.findOne({ user: auth.sub, attendanceDate });
         return NextResponse.json({ attendance: att, resumed: false });
       }
     }

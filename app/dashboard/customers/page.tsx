@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { PageHeader } from "@/components/common/page-header";
+import { useAppAlert } from "@/components/common/alert-provider";
 import { EmptyState } from "@/components/common/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +20,7 @@ import { customerSchema } from "@/lib/validators";
 type Customer = { _id: string; customerId: string; companyName: string; contactPerson?: string; mobile?: string; email?: string; status: string; createdAt: string };
 
 export default function CustomersPage() {
+  const { showAlert, showConfirm } = useAppAlert();
   const [items, setItems] = useState<Customer[]>([]);
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
@@ -48,9 +50,9 @@ export default function CustomersPage() {
     const method = editing ? "PUT" : "POST";
     const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(values) });
     setLoading(false);
-    if (res.ok) { setOpen(false); load(); } else alert("Failed: " + (await res.json()).error);
+    if (res.ok) { setOpen(false); load(); } else await showAlert("Failed: " + (await res.json()).error, "Error");
   }
-  async function onDelete(id: string) { if (!confirm("Delete customer?")) return; await fetch(`/api/customers/${id}`, { method: "DELETE" }); load(); }
+  async function onDelete(id: string) { if (!(await showConfirm("Delete customer?", { title: "Confirm Delete" }))) return; await fetch(`/api/customers/${id}`, { method: "DELETE" }); load(); }
 
   return (
     <div className="space-y-6">

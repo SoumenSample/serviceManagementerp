@@ -1,12 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useAppAlert } from "@/components/common/alert-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/common/page-header";
 
 export default function SettingsPage() {
+  const { showAlert } = useAppAlert();
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -23,7 +25,7 @@ export default function SettingsPage() {
     setSaving(true);
     const res = await fetch("/api/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(settings) });
     setSaving(false);
-    if (res.ok) { alert("Settings saved"); load(); } else alert("Failed: " + JSON.stringify(await res.json()));
+    if (res.ok) { await showAlert("Settings saved", "Notice"); load(); } else await showAlert("Failed: " + JSON.stringify(await res.json()), "Error");
   }
 
   if (loading) return <p className="p-6 text-sm text-muted-foreground">Loading settings...</p>;

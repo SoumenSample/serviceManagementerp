@@ -3,6 +3,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
+import { useAppAlert } from "@/components/common/alert-provider";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,7 @@ export default function VisitWorkflowPage() {
   const params = useParams<{ id: string }>();
   const serviceCallId = params.id;
   const router = useRouter();
+  const { showAlert } = useAppAlert();
   const [callId, setCallId] = useState<string>("");
   const [visits, setVisits] = useState<Visit[]>([]);
   const [selected, setSelected] = useState<Visit | null>(null);
@@ -92,22 +94,22 @@ export default function VisitWorkflowPage() {
     const payload: Record<string, unknown> = { ...values, visitDate: values.visitDate, visitPurpose, engineer: visitEngineer || undefined };
     const res = await fetch(`/api/service-calls/${serviceCallId}/visits`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     setLoading(false);
-    if (res.ok) { const doc = await res.json(); setSelected(doc); loadVisits(); alert(`Visit ${doc.visitId} (${doc.visitPurpose || visitPurpose}) created as NOT_STARTED`); } else alert("Create failed: " + JSON.stringify(await res.json()));
+    if (res.ok) { const doc = await res.json(); setSelected(doc); loadVisits(); await showAlert(`Visit ${doc.visitId} (${doc.visitPurpose || visitPurpose}) created as NOT_STARTED`, "Notice"); } else await showAlert("Create failed: " + JSON.stringify(await res.json()), "Error");
   }
 
   async function startVisit() {
     if (!selected) return;
-    if (!gps.lat || !gps.lng) return alert("Capture start GPS first");
+    if (!gps.lat || !gps.lng) { await showAlert("Capture start GPS first", "Error"); return; }
     setLoading(true);
     const res = await fetch(`/api/service-visits/${selected._id}/start`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ gpsLatitude: gps.lat, gpsLongitude: gps.lng, gpsAccuracy: gps.acc, gpsTimestamp: new Date().toISOString() }) });
     setLoading(false);
-    if (res.ok) { const doc = await res.json(); setSelected(doc); loadVisits(); } else alert("Start failed: " + JSON.stringify(await res.json()));
+    if (res.ok) { const doc = await res.json(); setSelected(doc); loadVisits(); } else await showAlert("Start failed: " + JSON.stringify(await res.json()), "Error");
   }
 
   async function completeVisit() {
     if (!selected) return;
-    if (!signature && !sigReason) return alert("Signature or reason required");
-    if (!callId) return alert("Service call not loaded yet");
+    if (!signature && !sigReason) { await showAlert("Signature or reason required", "Error"); return; }
+    if (!callId) { await showAlert("Service call not loaded yet", "Error"); return; }
     setLoading(true);
     try {
       let sigMeta: { url: string; publicId: string } | undefined;
@@ -135,9 +137,9 @@ export default function VisitWorkflowPage() {
         signatureReason: sigReason || undefined,
       };
       const res = await fetch(`/api/service-visits/${selected._id}/complete`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-      if (res.ok) { const doc = await res.json(); setSelected(doc); setBeforePhotos([]); setAfterPhotos([]); setSignature(null); loadVisits(); alert("Visit COMPLETED — photos & signature stored in Cloudinary"); } else alert("Complete failed: " + JSON.stringify(await res.json()));
+      if (res.ok) { const doc = await res.json(); setSelected(doc); setBeforePhotos([]); setAfterPhotos([]); setSignature(null); loadVisits(); await showAlert("Visit COMPLETED — photos & signature stored in Cloudinary", "Notice"); } else await showAlert("Complete failed: " + JSON.stringify(await res.json()), "Error");
     } catch (e) {
-      alert(e instanceof Error ? e.message : String(e));
+      await showAlert(e instanceof Error ? e.message : String(e), "Error");
     } finally { setLoading(false); }
   }
 
@@ -224,7 +226,7 @@ export default function VisitWorkflowPage() {
                   <Input placeholder="Remarks" value={partRemarks} onChange={(e) => setPartRemarks(e.target.value)} className="flex-1" />
                   <Button type="button" size="sm" disabled={!selectedPart || !partQty} onClick={async () => {
                     const res = await fetch("/api/part-requests", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ part: selectedPart, quantity: Number(partQty), serviceCall: serviceCallId, serviceVisit: selected._id, remarks: partRemarks }) });
-                    if (res.ok) { setPartQty("1"); setPartRemarks(""); loadPartRequests(); alert("Part request REQUIRED created"); } else alert("Failed: " + JSON.stringify(await res.json()));
+                    if (res.ok) { setPartQty("1"); setPartRemarks(""); loadPartRequests(); await showAlert("Part request REQUIRED created", "Notice"); } else await showAlert("Failed: " + JSON.stringify(await res.json()), "Error");
                   }}>Add Part</Button>
                 </div>
                 {partRequests.length > 0 && <div className="space-y-1">{partRequests.map((pr) => <div key={pr._id} className="flex justify-between text-xs border rounded p-2"><span className="font-mono">{pr.requestId} • {pr.part.partNumber} ×{pr.quantity}</span><Badge variant="outline">{pr.status}</Badge></div>)}</div>}

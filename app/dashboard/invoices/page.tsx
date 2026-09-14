@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useAppAlert } from "@/components/common/alert-provider";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +18,7 @@ import { invoiceSchema } from "@/lib/validators";
 type Inv = { _id: string; invoiceId: string; customer: { companyName: string }; totalAmount: number; paidAmount: number; outstanding: number; overdue: boolean; paymentStatus: string; invoiceDate: string; dueDate?: string };
 
 export default function InvoicesPage() {
+  const { showAlert } = useAppAlert();
   const [items, setItems] = useState<Inv[]>([]);
   const [customers, setCustomers] = useState<{ _id: string; companyName: string }[]>([]);
   const [open, setOpen] = useState(false);
@@ -47,7 +49,7 @@ export default function InvoicesPage() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(async (v: unknown) => {
               setLoading(true); const res = await fetch("/api/invoices", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(v) }); setLoading(false);
-              if (res.ok) { setOpen(false); load(); } else alert("Failed: " + JSON.stringify(await res.json()));
+              if (res.ok) { setOpen(false); load(); } else await showAlert("Failed: " + JSON.stringify(await res.json()), "Error");
             })} className="space-y-3">
               <FormField control={form.control} name="customer" render={({ field }) => (<FormItem><FormLabel>Customer *</FormLabel><Select value={field.value ?? ""} onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger></FormControl><SelectContent>{customers.map((c) => <SelectItem key={c._id} value={c._id}>{c.companyName}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
               <div className="grid grid-cols-2 gap-3">

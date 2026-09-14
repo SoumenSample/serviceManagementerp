@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { useAppAlert } from "@/components/common/alert-provider";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -139,6 +140,7 @@ type Detail = {
 export default function ServiceCallDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
+  const { showAlert, showConfirm } = useAppAlert();
   const [call, setCall] = useState<Detail | null>(null);
   const [statusOpen, setStatusOpen] = useState(false);
   const [newStatus, setNewStatus] = useState("");
@@ -169,13 +171,13 @@ export default function ServiceCallDetailPage() {
   }
   async function handleEditSave() {
     const res = await fetch(`/api/service-calls/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ priority: editPriority, problemDescription: editProblem, targetVisitDate: editTargetVisit || undefined, targetResolutionDate: editTargetResolution || undefined }) });
-    if (res.ok) { setEditOpen(false); load(); } else alert("Edit failed: " + JSON.stringify(await res.json()));
+    if (res.ok) { setEditOpen(false); load(); } else await showAlert("Edit failed: " + JSON.stringify(await res.json()), "Error");
   }
   async function handleDelete() {
-    if (!confirm("Permanently delete this service call? This cannot be undone.")) return;
+    if (!(await showConfirm("Permanently delete this service call? This cannot be undone.", { title: "Confirm Delete" }))) return;
     const res = await fetch(`/api/service-calls/${id}`, { method: "DELETE" });
     if (res.ok) window.location.href = "/dashboard/service-calls";
-    else alert("Delete failed: " + JSON.stringify(await res.json()));
+    else await showAlert("Delete failed: " + JSON.stringify(await res.json()), "Error");
   }
   useEffect(() => { load(); fetch("/api/engineers").then(async (r) => { if (r.ok) setEngineers((await r.json()).items); }); fetch("/api/auth/me").then(async (r) => { if (r.ok) { const j = await r.json(); setMyRole(j.user?.role || ""); } }); }, [id]);
 
@@ -198,32 +200,32 @@ export default function ServiceCallDetailPage() {
           {allowed.includes("WORK_COMPLETED") && myRole !== "engineer" && (
             <Button size="sm" variant="secondary" onClick={async () => {
               const res = await fetch(`/api/service-calls/${id}/status`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "WORK_COMPLETED", remarks: "Work completed" }) });
-              if (res.ok) load(); else alert("Failed: " + JSON.stringify(await res.json()));
+              if (res.ok) load(); else await showAlert("Failed: " + JSON.stringify(await res.json()), "Error");
             }}>Mark Work Completed</Button>
           )}
           {allowed.includes("CUSTOMER_CONFIRMATION") && myRole !== "engineer" && (
             <Button size="sm" variant="secondary" onClick={async () => {
               const res = await fetch(`/api/service-calls/${id}/status`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "CUSTOMER_CONFIRMATION", remarks: "Customer confirmation" }) });
-              if (res.ok) load(); else alert("Failed: " + JSON.stringify(await res.json()));
+              if (res.ok) load(); else await showAlert("Failed: " + JSON.stringify(await res.json()), "Error");
             }}>Customer Confirm</Button>
           )}
           {allowed.includes("CLOSED") && myRole !== "engineer" ? (
             <Button size="sm" variant="default" onClick={async () => {
-              if (!confirm("Close this service call? This will set actualResolutionDate.")) return;
+              if (!(await showConfirm("Close this service call? This will set actualResolutionDate.", { title: "Confirm Close" }))) return;
               const res = await fetch(`/api/service-calls/${id}/status`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "CLOSED", remarks: "Closed" }) });
-              if (res.ok) load(); else alert("Failed: " + JSON.stringify(await res.json()));
+              if (res.ok) load(); else await showAlert("Failed: " + JSON.stringify(await res.json()), "Error");
             }}>Close Call</Button>
           ) : allowed.includes("CANCELLED") && call.currentStatus !== "CLOSED" && call.currentStatus !== "CANCELLED" && myRole !== "engineer" ? (
             <Button size="sm" variant="destructive" onClick={async () => {
-              if (!confirm("Cancel this call?")) return;
+              if (!(await showConfirm("Cancel this call?", { title: "Confirm Cancel" }))) return;
               const res = await fetch(`/api/service-calls/${id}/status`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "CANCELLED", remarks: "Cancelled" }) });
-              if (res.ok) load(); else alert("Failed: " + JSON.stringify(await res.json()));
+              if (res.ok) load(); else await showAlert("Failed: " + JSON.stringify(await res.json()), "Error");
             }}>Cancel Call</Button>
           ) : null}
           {allowedFiltered.includes("REOPENED") && (
             <Button size="sm" variant="outline" onClick={async () => {
               const res = await fetch(`/api/service-calls/${id}/status`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "REOPENED", remarks: "Reopened" }) });
-              if (res.ok) load(); else alert("Failed: " + JSON.stringify(await res.json()));
+              if (res.ok) load(); else await showAlert("Failed: " + JSON.stringify(await res.json()), "Error");
             }}>Reopen</Button>
           )}
           <Button size="sm" variant="outline" onClick={() => setStatusOpen(true)}>Update Status</Button>
@@ -252,7 +254,7 @@ export default function ServiceCallDetailPage() {
             <Select value={assignEngineer} onValueChange={(v) => setAssignEngineer(v as string)}><SelectTrigger className="flex-1"><SelectValue placeholder="Assign engineer" /></SelectTrigger><SelectContent>{engineers.map((e) => <SelectItem key={e._id} value={e._id}>{e.name}</SelectItem>)}</SelectContent></Select>
             <Button size="sm" disabled={!assignEngineer} onClick={async () => {
               const res = await fetch(`/api/service-calls/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ assignedEngineer: assignEngineer }) });
-              if (res.ok) { setAssignEngineer(""); load(); } else alert("Assign failed");
+              if (res.ok) { setAssignEngineer(""); load(); } else await showAlert("Assign failed", "Error");
             }}>Assign</Button>
           </div>
         </CardContent></Card>
@@ -268,13 +270,13 @@ export default function ServiceCallDetailPage() {
                 <Button size="xs" variant="outline" onClick={async () => {
                   const res = await fetch(`/api/service-calls/${id}/request-closure-otp`, { method: "POST" });
                   const j = await res.json();
-                  if (res.ok) { setOtpSent(true); } else alert("Failed: " + JSON.stringify(j));
+                  if (res.ok) { setOtpSent(true); } else await showAlert("Failed: " + JSON.stringify(j), "Error");
                 }}>Request Closure OTP</Button>
                 <Input placeholder="Enter 6-digit OTP" value={otp} onChange={(e) => setOtp(e.target.value)} className="w-[140px]" />
                 <Button size="xs" disabled={!otp} onClick={async () => {
                   const res = await fetch(`/api/service-calls/${id}/verify-otp`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ otp }) });
                   const j = await res.json();
-                  if (res.ok) { alert(`Verified → ${j.status}`); setOtp(""); setOtpSent(false); load(); } else alert("Failed: " + JSON.stringify(j));
+                  if (res.ok) { await showAlert(`Verified → ${j.status}`, "Notice"); setOtp(""); setOtpSent(false); load(); } else await showAlert("Failed: " + JSON.stringify(j), "Error");
                 }}>Verify & Close</Button>
               </div>
               {otpSent && <p className="text-xs text-green-600">✓ OTP sent (10m expiry, 3 attempts)</p>}
@@ -332,7 +334,7 @@ export default function ServiceCallDetailPage() {
               onClick={async () => {
                 const res = await fetch(`/api/service-calls/${id}/status`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: newStatus, remarks }) });
                 if (res.ok) { setStatusOpen(false); setNewStatus(""); setRemarks(""); load(); }
-                else alert("Failed: " + JSON.stringify(await res.json()));
+                else await showAlert("Failed: " + JSON.stringify(await res.json()), "Error");
               }}
             >
               Update

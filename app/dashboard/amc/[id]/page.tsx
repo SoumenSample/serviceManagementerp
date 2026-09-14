@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { useAppAlert } from "@/components/common/alert-provider";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +29,7 @@ export default function AmcDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
   const router = useRouter();
+  const { showAlert, showConfirm } = useAppAlert();
   const [amc, setAmc] = useState<AmcDetail | null>(null);
   const [renewOpen, setRenewOpen] = useState(false);
   const [renewStart, setRenewStart] = useState("");
@@ -62,9 +64,9 @@ export default function AmcDetailPage() {
           <Button
             variant="destructive" size="sm"
             onClick={async () => {
-              if (!confirm("Cancel this AMC? (soft cancel, preserves history)")) return;
+              if (!(await showConfirm("Cancel this AMC? (soft cancel, preserves history)", { title: "Confirm Cancel" }))) return;
               const res = await fetch(`/api/amc/${amc._id}`, { method: "DELETE" });
-              if (res.ok) { alert("Cancelled"); load(); } else alert("Failed");
+              if (res.ok) { await showAlert("Cancelled", "Notice"); load(); } else await showAlert("Failed", "Error");
             }}
           >
             Cancel
@@ -149,11 +151,11 @@ export default function AmcDetailPage() {
               <div key={i} className="flex items-center justify-between border rounded-md px-3 py-2 text-sm">
                 <a href={d.url} target="_blank" rel="noopener" className="underline truncate mr-2">{d.fileName}</a>
                 <Button variant="outline" size="xs" onClick={async () => {
-                  if (!confirm(`Delete ${d.fileName}?`)) return;
+                  if (!(await showConfirm(`Delete ${d.fileName}?`, { title: "Confirm Delete" }))) return;
                   const pid = (d as unknown as { publicId: string }).publicId;
-                  if (!pid) return alert("Missing publicId");
+                  if (!pid) { await showAlert("Missing publicId", "Error"); return; }
                   const res = await fetch(`/api/amc/${amc._id}/documents?publicId=${encodeURIComponent(pid)}`, { method: "DELETE" });
-                  if (res.ok) load(); else alert("Delete failed: " + JSON.stringify(await res.json()));
+                  if (res.ok) load(); else await showAlert("Delete failed: " + JSON.stringify(await res.json()), "Error");
                 }}>Delete</Button>
               </div>
             ))}
@@ -190,7 +192,7 @@ export default function AmcDetailPage() {
             <Button
               disabled={loading}
               onClick={async () => {
-                if (!renewStart || !renewEnd) return alert("Dates required");
+                if (!renewStart || !renewEnd) { await showAlert("Dates required", "Error"); return; }
                 setLoading(true);
                 const res = await fetch(`/api/amc/${amc._id}/renew`, {
                   method: "POST",
@@ -200,10 +202,10 @@ export default function AmcDetailPage() {
                 setLoading(false);
                 if (res.ok) {
                   const d = await res.json();
-                  alert(`Renewed: ${d.newAmc.amcId}`);
+                  await showAlert(`Renewed: ${d.newAmc.amcId}`, "Notice");
                   setRenewOpen(false);
                   router.push(`/dashboard/amc/${d.newAmc._id}`);
-                } else alert("Renew failed: " + JSON.stringify(await res.json()));
+                } else await showAlert("Renew failed: " + JSON.stringify(await res.json()), "Error");
               }}
             >
               {loading ? "Renewing..." : "Create Renewal"}

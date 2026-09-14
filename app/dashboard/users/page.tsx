@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useAppAlert } from "@/components/common/alert-provider";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +29,7 @@ function canEditTarget(editorRole: string, targetRole: string, editorId: string,
 }
 
 export default function UsersPage() {
+  const { showAlert } = useAppAlert();
   const [items, setItems] = useState<User[]>([]);
   const [q, setQ] = useState("");
   const [role, setRole] = useState("all");
@@ -46,7 +48,7 @@ export default function UsersPage() {
     if (active !== "all") params.set("active", active);
     const res = await fetch(`/api/users?${params.toString()}`);
     if (res.ok) { const d = await res.json(); setItems(d.items); setTotalPages(d.totalPages); }
-    else if (res.status === 403) alert("Forbidden: users.manage required");
+    else if (res.status === 403) await showAlert("Forbidden: users.manage required", "Error");
   }
   useEffect(() => { load(); }, [q, role, active, page]);
   useEffect(() => {
@@ -76,7 +78,7 @@ export default function UsersPage() {
               <TableRow key={u._id}>
                 <TableCell className="font-medium">{u.name}</TableCell><TableCell className="text-xs">{u.email}</TableCell><TableCell><Badge variant="outline">{u.role}</Badge></TableCell><TableCell className="text-xs">{u.mobile || "-"}</TableCell><TableCell><Badge variant={u.isActive ? "default" : "secondary"}>{u.isActive ? "Active" : "Inactive"}</Badge></TableCell><TableCell className="text-xs">{new Date(u.createdAt).toLocaleDateString()}</TableCell><TableCell className="flex gap-1"><Link href={`/dashboard/users/${u._id}`}><Button size="xs" variant="outline">View</Button></Link><Button size="xs" variant={u.isActive ? "destructive" : "default"} disabled={!canEdit} title={!canEdit ? "No permission to edit this profile" : undefined} onClick={async () => {
                   const res = await fetch(`/api/users/${u._id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ isActive: !u.isActive }) });
-                  if (res.ok) load(); else alert("Failed: " + JSON.stringify(await res.json()));
+                  if (res.ok) load(); else await showAlert("Failed: " + JSON.stringify(await res.json()), "Error");
                 }}>{u.isActive ? "Deactivate" : "Activate"}</Button></TableCell>
               </TableRow>
             );})}</TableBody>
@@ -90,7 +92,7 @@ export default function UsersPage() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(async (v: unknown) => {
               setLoading(true); const res = await fetch("/api/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(v) }); setLoading(false);
-              if (res.ok) { setOpen(false); load(); } else alert("Failed: " + JSON.stringify(await res.json()));
+              if (res.ok) { setOpen(false); load(); } else await showAlert("Failed: " + JSON.stringify(await res.json()), "Error");
             })} className="space-y-3">
               <FormField control={form.control} name="name" render={({ field }) => (<FormItem><FormLabel>Name *</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
               <FormField control={form.control} name="email" render={({ field }) => (<FormItem><FormLabel>Email *</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem>)} />

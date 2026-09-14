@@ -3,6 +3,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useAppAlert } from "@/components/common/alert-provider";
 
 type Shift = {
   _id: string;
@@ -20,6 +21,7 @@ type Shift = {
 const CAPTURE_INTERVAL_MS = 30 * 1000; // 30 sec for faster admin feedback (spec 30-60)
 
 export function LocationTracker() {
+  const { showAlert, showConfirm } = useAppAlert();
   const [shift, setShift] = useState<Shift | null>(null);
   const [status, setStatus] = useState<"idle"|"active"|"permission_denied"|"unavailable"|"ended">("idle");
   const [lastUpdate, setLastUpdate] = useState<string | null>(null);
@@ -164,7 +166,7 @@ export function LocationTracker() {
   }, [capture, status]);
 
   const handleEndShift = async () => {
-    if (!confirm("End your shift? Your location tracking will stop.")) return;
+    if (!(await showConfirm("End your shift? Your location tracking will stop.", { title: "Confirm End Shift" }))) return;
     // End Attendance (which also ends EngineerShift for engineers)
     const attRes = await fetch("/api/attendance/end", { method: "POST" });
     // Also ensure EngineerShift ended (idempotent, attendance/end already does it)
@@ -176,7 +178,7 @@ export function LocationTracker() {
       // refresh shift state
       await fetchShift();
     } else {
-      alert("Failed to end shift");
+      await showAlert("Failed to end shift", "Error");
     }
   };
 

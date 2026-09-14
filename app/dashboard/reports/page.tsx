@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useAppAlert } from "@/components/common/alert-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -24,6 +25,7 @@ const REPORTS: { id: ReportType; label: string }[] = [
 ];
 
 export default function ReportsPage() {
+  const { showAlert } = useAppAlert();
   const [report, setReport] = useState<ReportType>("open-calls");
   const [items, setItems] = useState<Record<string, unknown>[]>([]);
   const [summary, setSummary] = useState<Record<string, unknown> | null>(null);
@@ -56,7 +58,7 @@ export default function ReportsPage() {
     const res = await fetch(`/api/reports?${params.toString()}`);
     setLoading(false);
     if (res.ok) { const d = await res.json(); setItems(d.items); setSummary(d.summary); setTotalPages(d.totalPages); }
-    else if (res.status === 403) { setItems([]); alert("Forbidden reports.view"); }
+    else if (res.status === 403) { setItems([]); await showAlert("Forbidden reports.view", "Error"); }
   }
   useEffect(() => { load(); }, [report, page, from, to, customer, site, engineer]);
   useEffect(() => { setPage(1); }, [report, from, to, customer, site, engineer]);
@@ -65,9 +67,9 @@ export default function ReportsPage() {
     const params = new URLSearchParams({ report, from, to, customer, site, engineer });
     const res = await fetch(`/api/reports/export?${params.toString()}&format=excel`);
     if (!res.ok) {
-      if (res.status === 403) return alert("Forbidden reports.export");
+      if (res.status === 403) { await showAlert("Forbidden reports.export", "Error"); return; }
       const j = await res.json().catch(() => ({}));
-      return alert("Export failed: " + (j.error || res.statusText));
+      await showAlert("Export failed: " + (j.error || res.statusText), "Error"); return;
     }
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
@@ -79,9 +81,9 @@ export default function ReportsPage() {
     const params = new URLSearchParams({ report, from, to, customer, site, engineer });
     const res = await fetch(`/api/reports/export?${params.toString()}&format=pdf`);
     if (!res.ok) {
-      if (res.status === 403) return alert("Forbidden reports.export");
+      if (res.status === 403) { await showAlert("Forbidden reports.export", "Error"); return; }
       const j = await res.json().catch(() => ({}));
-      return alert("Export failed: " + (j.error || res.statusText));
+      await showAlert("Export failed: " + (j.error || res.statusText), "Error"); return;
     }
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
+import { useAppAlert } from "@/components/common/alert-provider";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ import { EmptyState } from "@/components/common/empty-state";
 type PR = { _id: string; requestId: string; part: { partNumber: string; name: string }; serviceCall: { callId: string }; serviceVisit: { visitId: string }; quantity: number; status: string; requestedAt: string };
 
 export default function PartRequestsPage() {
+  const { showAlert } = useAppAlert();
   const [items, setItems] = useState<PR[]>([]);
   const [status, setStatus] = useState("all");
   const [page, setPage] = useState(1);
@@ -55,7 +57,7 @@ export default function PartRequestsPage() {
           <DialogFooter><Button variant="outline" onClick={() => setAction(null)}>Cancel</Button><Button onClick={async () => {
             if (!action) return;
             const res = await fetch(`/api/part-requests/${action.id}/status`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: action.next }) });
-            if (res.ok) { setAction(null); load(); } else alert("Failed: " + JSON.stringify(await res.json()));
+            if (res.ok) { setAction(null); load(); } else await showAlert("Failed: " + JSON.stringify(await res.json()), "Error");
           }}>Confirm</Button></DialogFooter>
         </DialogContent>
       </Dialog>

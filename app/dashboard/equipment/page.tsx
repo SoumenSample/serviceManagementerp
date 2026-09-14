@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { PageHeader } from "@/components/common/page-header";
+import { useAppAlert } from "@/components/common/alert-provider";
 import { EmptyState } from "@/components/common/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,7 @@ type Customer = { _id: string; companyName: string };
 type Site = { _id: string; siteName: string; customer: string };
 
 export default function EquipmentPage() {
+  const { showAlert, showConfirm } = useAppAlert();
   const [items, setItems] = useState<Equipment[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
@@ -57,9 +59,9 @@ export default function EquipmentPage() {
     setLoading(true);
     const res = await fetch("/api/equipment", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values) });
     setLoading(false);
-    if (res.ok) { setOpen(false); load(); } else alert("Failed: " + JSON.stringify(await res.json()));
+    if (res.ok) { setOpen(false); load(); } else await showAlert("Failed: " + JSON.stringify(await res.json()), "Error");
   }
-  async function onDelete(id: string) { if (!confirm("Delete equipment?")) return; await fetch(`/api/equipment/${id}`, { method: "DELETE" }); load(); }
+  async function onDelete(id: string) { if (!(await showConfirm("Delete equipment?", { title: "Confirm Delete" }))) return; await fetch(`/api/equipment/${id}`, { method: "DELETE" }); load(); }
 
   return (
     <div className="space-y-6">
