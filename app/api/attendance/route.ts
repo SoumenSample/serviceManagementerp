@@ -11,6 +11,11 @@ export async function GET() {
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   await connectDB();
   const attendanceDate = getISTDateString(new Date());
+  // Close any previous-day ACTIVE left open (browser closed without logout)
+  try {
+    const { closeStaleAttendancesForUser } = await import("@/lib/attendance-server");
+    await closeStaleAttendancesForUser(auth.sub, attendanceDate);
+  } catch {}
   const today = await Attendance.findOne({ user: auth.sub, attendanceDate }).lean();
   if (today) {
     return NextResponse.json({ attendance: today, latest: today });

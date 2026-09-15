@@ -16,6 +16,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (auth.role === "engineer" && String(auth.sub) !== String(id)) return NextResponse.json({ error: "Forbidden: engineers can only view own location" }, { status: 403 });
   if (!allowed && auth.role !== "engineer") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   await connectDB();
+  try {
+    const { closeStaleEngineerShiftsForEngineer } = await import("@/lib/attendance-server");
+    await closeStaleEngineerShiftsForEngineer(id);
+  } catch {}
   const eng = await User.findById(id).select("name email employeeId role").lean();
   if (!eng || eng.role !== "engineer") return NextResponse.json({ error: "Engineer not found" }, { status: 404 });
   const shift = await EngineerShift.findOne({ engineer: id }).sort({ startedAt: -1 }).lean() as unknown as { _id: unknown; shiftId: string; status: string; startedAt: Date; endedAt?: Date; lastLocationAt?: Date; lastLatitude?: number; lastLongitude?: number; lastAddress?: string; lastAccuracy?: number } | null;

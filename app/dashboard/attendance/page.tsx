@@ -23,21 +23,36 @@ type AttendanceItem = {
   sessions?: { loginAt: string; logoutAt?: string }[];
 };
 
-function calcTotalDuration(sessions?: { loginAt: string; logoutAt?: string }[], startedAt?: string, endedAt?: string, nowTick?: number): string {
-  // Prefer sessions sum
+function todayIST(): string {
+  try {
+    return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  } catch {
+    return new Date().toISOString().slice(0, 10);
+  }
+}
+
+function calcTotalDuration(sessions?: { loginAt: string; logoutAt?: string }[], startedAt?: string, endedAt?: string, nowTick?: number, attendanceDate?: string): string {
+  // Prefer sessions sum. For past IST dates, cap open sessions at day-end so
+  // yesterday's rows never show growing 24h (live) durations.
+  const today = todayIST();
+  const isPast = !!(attendanceDate && attendanceDate < today);
+  const dayEndMs = attendanceDate ? new Date(`${attendanceDate}T23:59:59.999+05:30`).getTime() : NaN;
   if (sessions && sessions.length > 0) {
     let totalMs = 0;
     const now = Date.now();
     void nowTick;
     for (const s of sessions) {
       const st = new Date(s.loginAt).getTime();
-      const en = s.logoutAt ? new Date(s.logoutAt).getTime() : now;
+      let en: number;
+      if (s.logoutAt) en = new Date(s.logoutAt).getTime();
+      else if (isPast && !isNaN(dayEndMs)) en = Math.max(st, dayEndMs);
+      else en = now;
       if (!isNaN(st) && !isNaN(en) && en >= st) totalMs += en - st;
     }
     const h = Math.floor(totalMs / 3600000);
     const m = Math.floor((totalMs % 3600000) / 60000);
     const hasOpen = sessions.some((x) => !x.logoutAt);
-    if (hasOpen) return `${h}h ${m}m (live)`;
+    if (hasOpen && !isPast) return `${h}h ${m}m (live)`;
     const s = Math.floor((totalMs % 60000) / 1000);
     return `${h}h ${m}m ${s}s`;
   }
@@ -149,8 +164,12 @@ export default function AttendancePage() {
                   <TableCell className="text-xs">{firstLogin ? new Date(firstLogin).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "-"}</TableCell>
                   <TableCell className="text-xs">{lastLogout ? new Date(lastLogout).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : (a.status === "ACTIVE" ? "Active" : "-")}</TableCell>
                   <TableCell className="text-xs text-center">{sessions.length > 0 ? sessions.length : 1}</TableCell>
-                  <TableCell className="text-xs">{calcTotalDuration(sessions, a.startedAt, a.endedAt, tick)}</TableCell>
-                  <TableCell>{a.status === "ACTIVE" ? <Badge className="bg-green-600">🟢 Active</Badge> : <Badge variant="outline">⚪ Ended</Badge>}</TableCell>
+                  <TableCell className="text-xs">{calcTotalDuration(sessions, a.startedAt, a.endedAt, tick, a.attendanceDate)}</TableCell>
+                  <TableCell>{(() => {
+                    const isStale = !!(a.attendanceDate && a.attendanceDate < todayIST() && a.status === "ACTIVE");
+                    if (a.status === "ACTIVE" && !isStale) return <Badge className="bg-green-600">🟢 Active</Badge>;
+                    return <Badge variant="outline" title={isStale ? "Auto-closed at day end (no logout)" : undefined}>⚪ Ended</Badge>;
+                  })()}</TableCell>
                   <TableCell><Link href={`/dashboard/attendance/${a.attendanceId}`}><Button size="xs" variant="outline">View</Button></Link></TableCell>
                 </TableRow>
               );

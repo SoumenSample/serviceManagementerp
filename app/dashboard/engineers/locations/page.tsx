@@ -21,6 +21,23 @@ function freshnessBadge(f: string) {
   return <Badge variant="outline">⚪ Offline</Badge>;
 }
 
+function todayIST(): string {
+  try {
+    return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  } catch {
+    return new Date().toISOString().slice(0, 10);
+  }
+}
+
+function shiftISTDate(shift?: { startedAt: string } | null): string | null {
+  if (!shift?.startedAt) return null;
+  try {
+    return new Date(shift.startedAt).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  } catch {
+    return null;
+  }
+}
+
 function timeAgo(dateStr?: string) {
   if (!dateStr) return "—";
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -54,7 +71,17 @@ export default function EngineerLocationsPage() {
     setRefreshing(true);
     try {
       // Ask all ACTIVE engineers to send fresh location immediately
-      const active = items.filter(i => i.isActive);
+      // (skip previous-day stale shifts — those engineers are offline)
+      const today = todayIST();
+      const active = items.filter(i => {
+        if (!i.isActive) return false;
+        try {
+          const d = i.shift ? new Date(i.shift.startedAt).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }) : null;
+          return !d || d >= today;
+        } catch {
+          return true;
+        }
+      });
       await Promise.all(active.map(i => fetch(`/api/engineers/${i.engineer._id}/request-location`, { method: "POST" }).catch(()=>{})));
       // Wait 4s for engineers' PWA to capture and post, then reload
       await new Promise(r => setTimeout(r, 4000));
@@ -86,7 +113,13 @@ export default function EngineerLocationsPage() {
             <Table>
               <TableHeader><TableRow><TableHead>Engineer</TableHead><TableHead>Status</TableHead><TableHead>Location</TableHead><TableHead>Updated</TableHead><TableHead>Current Call</TableHead><TableHead>Map</TableHead></TableRow></TableHeader>
               <TableBody>
-                {items.map(({ engineer, shift, currentCall, freshness, isActive }) => (
+                {items.map(({ engineer, shift, currentCall, freshness, isActive }) => {
+                  // Defensive: a shift started on a previous IST date can never be live,
+                  // even if the DB row is still ACTIVE (cleanup runs server-side)
+                  const shiftDate = shiftISTDate(shift);
+                  const isStaleShift = !!(shiftDate && shiftDate < todayIST() && shift?.status === "ACTIVE");
+                  const showActive = isActive && !isStaleShift;
+                  return (
                   <TableRow key={engineer._id}>
                     <TableCell>
                       <Link href={`/dashboard/engineers/${engineer._id}/location`} className="hover:underline">
@@ -96,7 +129,7 @@ export default function EngineerLocationsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col gap-1">
-                        {isActive ? <Badge className="bg-green-600 w-fit">🟢 Active</Badge> : <Badge variant="outline">⚪ Offline</Badge>}
+                        {showActive ? <Badge className="bg-green-600 w-fit">🟢 Active</Badge> : <Badge variant="outline" title={isStaleShift ? "Shift from a previous day — auto-closed" : undefined}>⚪ Offline</Badge>}
                         <span className="text-[11px] text-muted-foreground">{shift ? new Date(shift.startedAt).toLocaleDateString() : "No shift"}</span>
                       </div>
                     </TableCell>
@@ -127,7 +160,7 @@ export default function EngineerLocationsPage() {
                         {shift?.lastLatitude && shift?.lastLongitude ? (
                           <a href={`https://www.google.com/maps/search/?api=1&query=${shift.lastLatitude},${shift.lastLongitude}`} target="_blank" rel="noopener"><Button size="sm" variant="outline">Map</Button></a>
                         ) : "—"}
-                        {isActive && (
+                        {showActive && (
                           <Button size="sm" variant="secondary" disabled={refreshing} title="Request this engineer to send live GPS now"
                             onClick={async () => {
                               setRefreshing(true);
@@ -142,7 +175,8 @@ export default function EngineerLocationsPage() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </div>

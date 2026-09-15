@@ -12,6 +12,10 @@ export async function GET(req: Request) {
   const skip = (page - 1) * limit;
 
   await connectDB();
+  try {
+    const { closeStaleAttendancesForUser } = await import("@/lib/attendance-server");
+    await closeStaleAttendancesForUser(auth.sub);
+  } catch {}
   const filter: Record<string, unknown> = { user: auth.sub };
   const status = searchParams.get("status");
   if (status) filter.status = status;

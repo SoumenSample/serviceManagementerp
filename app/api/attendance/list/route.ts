@@ -26,6 +26,13 @@ export async function GET(req: Request) {
 
   await connectDB();
 
+  // Lazy cleanup: auto-close previous-day ACTIVE records so list never shows
+  // yesterday's rows as live Active with growing 24h durations
+  try {
+    const { closeAllStaleAttendances } = await import("@/lib/attendance-server");
+    await closeAllStaleAttendances();
+  } catch {}
+
   const filter: Record<string, unknown> = {};
   if (role) filter.role = role;
   if (status) filter.status = status;

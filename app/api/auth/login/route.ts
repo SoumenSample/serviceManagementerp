@@ -54,6 +54,15 @@ export async function POST(req: Request) {
       const now = new Date();
       const attendanceDate = getISTDateString(now);
 
+      // Auto-close any ACTIVE attendance from previous IST dates (user closed browser without logout)
+      try {
+        const { closeStaleAttendancesForUser, closeStaleEngineerShiftsForEngineer } = await import("@/lib/attendance-server");
+        await closeStaleAttendancesForUser(user._id, attendanceDate);
+        if (user.role === "engineer") {
+          await closeStaleEngineerShiftsForEngineer(user._id, attendanceDate);
+        }
+      } catch {}
+
       let att = await Attendance.findOne({ user: user._id, attendanceDate });
       if (!att) {
         // Try to create today's attendance; handle race duplicate

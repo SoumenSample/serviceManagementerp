@@ -13,6 +13,12 @@ export async function GET() {
   const allowed = hasPermission(auth.role, "users.view") || hasPermission(auth.role, "users.manage") || ["super_admin","manager","coordinator"].includes(auth.role);
   if (!allowed) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   await connectDB();
+  // Lazy cleanup: auto-close previous-day ACTIVE GPS shifts (browser closed without
+  // logout) so engineers who haven't logged in today don't show a green Active badge
+  try {
+    const { closeStaleEngineerShifts } = await import("@/lib/attendance-server");
+    await closeStaleEngineerShifts();
+  } catch {}
   const engineers = await User.find({ role: "engineer", isActive: true }).select("name email employeeId").lean();
   const results = await Promise.all(
     engineers.map(async (eng) => {

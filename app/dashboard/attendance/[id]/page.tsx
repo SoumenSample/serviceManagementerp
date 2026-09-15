@@ -23,22 +23,45 @@ type Attendance = {
   sessions?: Session[];
 };
 
-function calcSessionDuration(loginAt: string, logoutAt?: string): string {
+function dayEndMs(attendanceDate?: string): number {
+  if (!attendanceDate) return NaN;
+  return new Date(`${attendanceDate}T23:59:59.999+05:30`).getTime();
+}
+function isPastDate(attendanceDate?: string): boolean {
+  if (!attendanceDate) return false;
+  try {
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+    return attendanceDate < today;
+  } catch {
+    return false;
+  }
+}
+function calcSessionDuration(loginAt: string, logoutAt?: string, attendanceDate?: string): string {
   const st = new Date(loginAt).getTime();
-  const en = logoutAt ? new Date(logoutAt).getTime() : Date.now();
+  let en: number;
+  if (logoutAt) en = new Date(logoutAt).getTime();
+  else if (isPastDate(attendanceDate)) {
+    const de = dayEndMs(attendanceDate);
+    en = isNaN(de) ? st : Math.max(st, de);
+  } else en = Date.now();
   const diff = Math.max(0, en - st);
   const h = Math.floor(diff / 3600000);
   const m = Math.floor((diff % 3600000) / 60000);
   const s = Math.floor((diff % 60000) / 1000);
   return `${h}h ${m}m ${s}s`;
 }
-function calcTotal(sessions?: Session[], startedAt?: string, endedAt?: string): string {
+function calcTotal(sessions?: Session[], startedAt?: string, endedAt?: string, attendanceDate?: string): string {
   if (sessions && sessions.length > 0) {
     let total = 0;
     const now = Date.now();
+    const past = isPastDate(attendanceDate);
+    const de = dayEndMs(attendanceDate);
     for (const s of sessions) {
       const st = new Date(s.loginAt).getTime();
-      const en = s.logoutAt ? new Date(s.logoutAt).getTime() : now;
+      let en: number;
+      if (s.logoutAt) en = new Date(s.logoutAt).getTime();
+      else if (past && !isNaN(de)) en = Math.max(st, de);
+      else en = now;
       if (!isNaN(st) && !isNaN(en) && en >= st) total += en - st;
     }
     const h = Math.floor(total / 3600000);
@@ -90,7 +113,7 @@ export default function AttendanceDetailPage() {
             <div><p className="text-muted-foreground text-xs">Employee</p><p className="font-medium">{data.user?.name} <span className="text-muted-foreground">({data.user?.email})</span></p><p className="text-xs text-muted-foreground">{data.user?.employeeId || ""}</p></div>
             <div><p className="text-muted-foreground text-xs">Role</p><Badge variant="outline">{data.role}</Badge></div>
             <div><p className="text-muted-foreground text-xs">Date (IST)</p><p>{dateStr}</p></div>
-            <div><p className="text-muted-foreground text-xs">Total Worked</p><p className="font-medium">{calcTotal(sessions, data.startedAt, data.endedAt)}</p><p className="text-xs text-muted-foreground">{data.status === "ACTIVE" ? "live (open session → now)" : "final (sum of sessions)"}</p></div>
+            <div><p className="text-muted-foreground text-xs">Total Worked</p><p className="font-medium">{calcTotal(sessions, data.startedAt, data.endedAt, data.attendanceDate)}</p><p className="text-xs text-muted-foreground">{data.status === "ACTIVE" && !isPastDate(data.attendanceDate) ? "live (open session → now)" : "final (sum of sessions)"}</p></div>
             <div><p className="text-muted-foreground text-xs">Sessions</p><p>{sessions.length}</p></div>
             <div><p className="text-muted-foreground text-xs">Started At</p><p>{new Date(data.startedAt).toLocaleString()}</p></div>
             <div><p className="text-muted-foreground text-xs">Ended At</p><p>{data.endedAt ? new Date(data.endedAt).toLocaleString() : "-"}</p></div>
@@ -108,7 +131,7 @@ export default function AttendanceDetailPage() {
                     <TableCell>{idx + 1}</TableCell>
                     <TableCell className="text-xs">{new Date(s.loginAt).toLocaleString()}</TableCell>
                     <TableCell className="text-xs">{s.logoutAt ? new Date(s.logoutAt).toLocaleString() : <Badge className="bg-green-600">Active</Badge>}</TableCell>
-                    <TableCell className="text-xs">{calcSessionDuration(s.loginAt, s.logoutAt)}</TableCell>
+                    <TableCell className="text-xs">{calcSessionDuration(s.loginAt, s.logoutAt, data.attendanceDate)}</TableCell>
                     <TableCell>{s.logoutAt ? <Badge variant="outline">Closed</Badge> : <Badge className="bg-green-600">Open</Badge>}</TableCell>
                   </TableRow>
                 ))}
